@@ -5,6 +5,7 @@ import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dia
 import { Field, Label } from "@/components/fieldset";
 import { Input } from "@/components/input";
 import { Button } from "@/components/button";
+import DateRangeManager from "./DateRangeManager";
 
 export default function AddManagerPayscaleModal({ plans, supabase, onClose }) {
   const [form, setForm] = useState({
@@ -12,6 +13,8 @@ export default function AddManagerPayscaleModal({ plans, supabase, onClose }) {
     commissions: {},
     upgradeCommissions: {},
   });
+
+  const [dateRanges, setDateRanges] = useState([]);
 
   function updateCommission(planId, value, isUpgrade = false) {
     if (isUpgrade) {
@@ -30,7 +33,7 @@ export default function AddManagerPayscaleModal({ plans, supabase, onClose }) {
   async function addPayscale() {
     if (!form.name.trim()) return;
 
-    // Insert payscale
+    // 1) Insert payscale
     const { data: inserted } = await supabase
       .from("manager_payscales")
       .insert([{ name: form.name.trim() }])
@@ -38,18 +41,48 @@ export default function AddManagerPayscaleModal({ plans, supabase, onClose }) {
       .single();
     if (!inserted) return;
 
-    // Insert commissions
+    // 2) Insert base commissions
     const arr = plans.map((p) => ({
       manager_payscale_id: inserted.id,
       plan_id: p.id,
       manager_commission_type: "fixed_amount",
       manager_commission_value: parseFloat(form.commissions[p.id] || "0"),
       manager_upgrade_commission_type: "fixed_amount",
-      manager_upgrade_commission_value: parseFloat(
-        form.upgradeCommissions[p.id] || "0"
-      ),
+      manager_upgrade_commission_value: parseFloat(form.upgradeCommissions[p.id] || "0"),
     }));
     await supabase.from("manager_payscale_plan_commissions").insert(arr);
+
+    // 3) Insert date range overrides
+    for (const dr of dateRanges) {
+      const { data: insertedRange } = await supabase
+        .from("manager_payscale_date_ranges")
+        .insert([
+          {
+            manager_payscale_id: inserted.id,
+            start_date: dr.start_date,
+            end_date: dr.end_date || null,
+          },
+        ])
+        .select("*")
+        .single();
+      if (!insertedRange) continue;
+
+      const planCommArr = [];
+      for (const p of plans) {
+        const valObj = dr.planValues[p.id] || { base: "0", upgrade: "0" };
+        planCommArr.push({
+          manager_payscale_date_range_id: insertedRange.id,
+          plan_id: p.id,
+          manager_commission_type: "fixed_amount",
+          manager_commission_value: parseFloat(valObj.base || "0"),
+          manager_upgrade_commission_type: "fixed_amount",
+          manager_upgrade_commission_value: parseFloat(valObj.upgrade || "0"),
+        });
+      }
+      await supabase
+        .from("manager_payscale_date_range_plan_commissions")
+        .insert(planCommArr);
+    }
 
     onClose();
   }
@@ -66,7 +99,7 @@ export default function AddManagerPayscaleModal({ plans, supabase, onClose }) {
           />
         </Field>
 
-        <h3 className="font-semibold mb-2">Commissions (per plan)</h3>
+        <h3 className="font-semibold mb-2">Base Commissions (per plan)</h3>
         {plans.map((p) => (
           <div key={p.id} className="border p-2 mb-2 rounded">
             <div className="font-medium mb-1">{p.name}</div>
@@ -88,6 +121,15 @@ export default function AddManagerPayscaleModal({ plans, supabase, onClose }) {
             </Field>
           </div>
         ))}
+
+        <hr className="my-4" />
+
+        <DateRangeManager
+          plans={plans}
+          dateRanges={dateRanges}
+          setDateRanges={setDateRanges}
+          label="Add Date Ranges for Additional Commission Rules"
+        />
       </DialogBody>
       <DialogActions>
         <Button plain onClick={onClose}>

@@ -14,7 +14,6 @@ export default function PayscalesPage() {
   const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
 
-  // Main data store
   const [plans, setPlans] = useState([]);
   const [fidiumPlans, setFidiumPlans] = useState([]);
   const [agents, setAgents] = useState([]);
@@ -180,7 +179,6 @@ export default function PayscalesPage() {
         </Tab.List>
 
         <Tab.Panels>
-          {/* 1) USERS */}
           <Tab.Panel>
             <TabUsers
               agents={agents}
@@ -195,12 +193,10 @@ export default function PayscalesPage() {
             />
           </Tab.Panel>
 
-          {/* 2) PLANS */}
           <Tab.Panel>
             <TabPlans plans={plans} supabase={supabase} onRefresh={fetchPlans} />
           </Tab.Panel>
 
-          {/* 3) PERSONAL PAY */}
           <Tab.Panel>
             <TabPersonalPayscales
               plans={plans}
@@ -210,7 +206,6 @@ export default function PayscalesPage() {
             />
           </Tab.Panel>
 
-          {/* 4) MANAGER PAY */}
           <Tab.Panel>
             <TabManagerPayscales
               plans={plans}
@@ -222,7 +217,6 @@ export default function PayscalesPage() {
             />
           </Tab.Panel>
 
-          {/* 5) FIDIUM PERSONAL */}
           <Tab.Panel>
             <TabFidiumPersonalPayscales
               fidiumPlans={fidiumPlans}
@@ -232,7 +226,6 @@ export default function PayscalesPage() {
             />
           </Tab.Panel>
 
-          {/* 6) FIDIUM MANAGER */}
           <Tab.Panel>
             <TabFidiumManagerPayscales
               fidiumPlans={fidiumPlans}

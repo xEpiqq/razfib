@@ -1,0 +1,4841 @@
+
+
+// app/protected/payroll/FidiumFlow.jsx
+"use client";
+
+import React, { useState, useRef } from "react";
+import Papa from "papaparse";
+import { createClient } from "@/utils/supabase/client";
+import { Button } from "@/components/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/table";
+import { Input } from "@/components/input";
+import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/20/solid";
+
+/**
+ * Plan-based override for Fidium manager:
+ *  1) Check fidium_manager_agent_commissions for (manager, agent, fidium_plan).
+ *  2) If found, see if there's a date range row in fidium_manager_agent_commission_date_ranges for that plan.
+ */
+async function getFidiumManagerOverride({
+  supabase,
+  managerId,
+  agentId,
+  planId,
+  submissionDate,
+}) {
+  if (!managerId || !agentId || !planId) return null;
+
+  const { data: overrideRows } = await supabase
+    .from("fidium_manager_agent_commissions")
+    .select("id, manager_commission_value")
+    .eq("manager_id", managerId)
+    .eq("agent_id", agentId)
+    .eq("fidium_plan_id", planId);
+
+  if (!overrideRows || overrideRows.length === 0) return null;
+
+  const override = overrideRows[0];
+  const baseVal = override.manager_commission_value;
+
+  // date ranges for that override + plan
+  const { data: rangeRows } = await supabase
+    .from("fidium_manager_agent_commission_date_ranges")
+    .select("*")
+    .eq("fidium_manager_agent_commission_id", override.id)
+    .eq("fidium_plan_id", planId);
+
+  if (!rangeRows || rangeRows.length === 0) return baseVal;
+
+  const subDate = submissionDate instanceof Date ? submissionDate : new Date(submissionDate);
+  let matchedRange = null;
+  for (const rr of rangeRows) {
+    const start = new Date(rr.start_date);
+    const end = rr.end_date ? new Date(rr.end_date) : null;
+    if (subDate >= start && (!end || subDate <= end)) {
+      if (!matchedRange) matchedRange = rr;
+      else if (new Date(rr.start_date) > new Date(matchedRange.start_date)) {
+        matchedRange = rr;
+      }
+    }
+  }
+
+  if (matchedRange) return matchedRange.manager_commission_value;
+  return baseVal;
+}
+
+/**
+ * Fidium personal commission = plan-based + optional plan-based date ranges
+ */
+async function getFidiumPersonalCommission({
+  supabase,
+  fidiumPersonalPayscaleId,
+  fidiumPlanId,
+  submissionDate,
+}) {
+  const { data: drs } = await supabase
+    .from("fidium_personal_payscale_date_ranges")
+    .select("*, fidium_personal_payscale_date_range_plan_commissions(*)")
+    .eq("fidium_personal_payscale_id", fidiumPersonalPayscaleId);
+
+  if (!drs || drs.length === 0) {
+    const { data: baseComm } = await supabase
+      .from("fidium_personal_payscale_plan_commissions")
+      .select("*")
+      .eq("fidium_personal_payscale_id", fidiumPersonalPayscaleId)
+      .eq("fidium_plan_id", fidiumPlanId)
+      .single();
+    return baseComm?.rep_commission_value || 0;
+  }
+
+  const subDateObj = new Date(submissionDate);
+  let matchedRange = null;
+  for (const dr of drs) {
+    const start = new Date(dr.start_date);
+    const end = dr.end_date ? new Date(dr.end_date) : null;
+    if (subDateObj >= start && (!end || subDateObj <= end)) {
+      if (!matchedRange) matchedRange = dr;
+      else if (new Date(dr.start_date) > new Date(matchedRange.start_date)) {
+        matchedRange = dr;
+      }
+    }
+  }
+  if (matchedRange) {
+    const pc = matchedRange.fidium_personal_payscale_date_range_plan_commissions.find(
+      (x) => x.fidium_plan_id === fidiumPlanId
+    );
+    return pc?.rep_commission_value || 0;
+  } else {
+    const { data: baseComm } = await supabase
+      .from("fidium_personal_payscale_plan_commissions")
+      .select("*")
+      .eq("fidium_personal_payscale_id", fidiumPersonalPayscaleId)
+      .eq("fidium_plan_id", fidiumPlanId)
+      .single();
+    return baseComm?.rep_commission_value || 0;
+  }
+}
+
+/**
+ * Fidium manager payscale is also plan-based, with optional date ranges
+ */
+async function getFidiumManagerCommission({
+  supabase,
+  fidiumManagerPayscaleId,
+  fidiumPlanId,
+  submissionDate,
+}) {
+  const { data: drs } = await supabase
+    .from("fidium_manager_payscale_date_ranges")
+    .select("*, fidium_manager_payscale_date_range_plan_commissions(*)")
+    .eq("fidium_manager_payscale_id", fidiumManagerPayscaleId);
+
+  if (!drs || drs.length === 0) {
+    const { data: baseComm } = await supabase
+      .from("fidium_manager_payscale_plan_commissions")
+      .select("*")
+      .eq("fidium_manager_payscale_id", fidiumManagerPayscaleId)
+      .eq("fidium_plan_id", fidiumPlanId)
+      .single();
+    return baseComm?.manager_commission_value || 0;
+  }
+
+  const subDateObj = new Date(submissionDate);
+  let matchedRange = null;
+  for (const dr of drs) {
+    const start = new Date(dr.start_date);
+    const end = dr.end_date ? new Date(dr.end_date) : null;
+    if (subDateObj >= start && (!end || subDateObj <= end)) {
+      if (!matchedRange) {
+        matchedRange = dr;
+      } else if (new Date(dr.start_date) > new Date(matchedRange.start_date)) {
+        matchedRange = dr;
+      }
+    }
+  }
+
+  if (matchedRange) {
+    const pc = matchedRange.fidium_manager_payscale_date_range_plan_commissions.find(
+      (x) => x.fidium_plan_id === fidiumPlanId
+    );
+    return pc?.manager_commission_value || 0;
+  } else {
+    const { data: baseComm } = await supabase
+      .from("fidium_manager_payscale_plan_commissions")
+      .select("*")
+      .eq("fidium_manager_payscale_id", fidiumManagerPayscaleId)
+      .eq("fidium_plan_id", fidiumPlanId)
+      .single();
+    return baseComm?.manager_commission_value || 0;
+  }
+}
+
+export default function FidiumFlow({ supabase }) {
+  const [fidiumFile, setFidiumFile] = useState(null);
+  const fidiumFileRef = useRef(null);
+
+  const [fidiumReport, setFidiumReport] = useState([]);
+  const [fidiumDetails, setFidiumDetails] = useState({});
+  const [expandedFidium, setExpandedFidium] = useState(new Set());
+  const [fidiumBatchName, setFidiumBatchName] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleFidiumFileClick = () => fidiumFileRef.current.click();
+
+  function toggleFidiumExpand(agentId) {
+    setExpandedFidium((prev) => {
+      const newSet = new Set(prev);
+      newSet.has(agentId) ? newSet.delete(agentId) : newSet.add(agentId);
+      return newSet;
+    });
+  }
+
+  async function parseFidiumFile() {
+    if (!fidiumFile) {
+      alert("Please select a Fidium CSV file.");
+      return;
+    }
+    setLoading(true);
+
+    Papa.parse(fidiumFile, {
+      header: true,
+      complete: async (res) => {
+        try {
+          const fidiumRows = res.data || [];
+          await upsertFidiumPlans(fidiumRows);
+          await upsertFidiumSalesmen(fidiumRows);
+          await insertFidiumWhiteGloveEntries(fidiumRows);
+          await generateFidiumReport(fidiumRows);
+        } catch (err) {
+          console.error("Error processing Fidium CSV:", err);
+          alert("Error processing Fidium CSV");
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
+  }
+
+  async function upsertFidiumPlans(fidiumRows) {
+    const planSet = new Set();
+    fidiumRows.forEach((row) => {
+      const planRaw = row["REQUESTED_SERVICES"]?.trim();
+      if (planRaw) planSet.add(planRaw);
+    });
+    for (const planName of planSet) {
+      await supabase
+        .from("fidium_plans")
+        .upsert([{ name: planName, commission_amount: 0 }], { onConflict: "name" });
+    }
+  }
+
+  async function upsertFidiumSalesmen(fidiumRows) {
+    const repSet = new Set();
+    fidiumRows.forEach((row) => {
+      if (row["SALES_REP"]?.trim()) {
+        repSet.add(row["SALES_REP"].trim());
+      }
+    });
+    const { data: existing } = await supabase.from("fidium_salesmen").select("rep_name");
+    const existingSet = new Set((existing || []).map((x) => x.rep_name));
+    const newReps = [...repSet].filter((r) => !existingSet.has(r));
+    if (newReps.length > 0) {
+      await supabase.from("fidium_salesmen").insert(newReps.map((r) => ({ rep_name: r })));
+    }
+  }
+
+  async function insertFidiumWhiteGloveEntries(fidiumRows) {
+    function parseDate(dateStr) {
+      if (!dateStr) return null;
+      const d = new Date(dateStr);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    function parseFloatOrNull(val) {
+      if (!val) return null;
+      const f = parseFloat(val);
+      return isNaN(f) ? null : f;
+    }
+
+    const entries = fidiumRows.map((row) => ({
+      sales_partner: row["SALES_PARTNER"] || null,
+      dsi_dealer_type: row["DSI_DEALER_TYPE"] || null,
+      sale_format: row["SALE_FORMAT"] || null,
+      sales_rep: row["SALES_REP"] || null,
+      submission_date: parseDate(row["SUBMISSION_DATE"]),
+      customer_name: row["CUSTOMER_NAME"] || null,
+      service_address: row["SERVICE_ADDRESS"] || null,
+      city: row["CITY"] || null,
+      state: row["STATE"] || null,
+      zip: row["ZIP"] || null,
+      order_type: row["ORDER_TYPE"] || null,
+      requested_services: row["REQUESTED_SERVICES"] || null,
+      status_change_date: parseDate(row["STATUS_CHANGE_DATE"]),
+      sales_status: row["SALES_STATUS"] || null,
+      install_status: row["INSTALL_STATUS"] || null,
+      order_number: row["ORDER_NUMBER"] || null,
+      install_date: parseDate(row["INSTALL_DATE"]),
+      amount: parseFloatOrNull(row["Amount"]),
+      frontend_paid: false,
+      backend_paid: false,
+    }));
+
+    await supabase
+      .from("fidium_white_glove_entries")
+      .upsert(entries, { onConflict: "order_number,requested_services" });
+  }
+
+  async function generateFidiumReport(fidiumRows) {
+    const { data: agents } = await supabase.from("agents").select("*");
+    const { data: agentManagers } = await supabase.from("agent_managers").select("*");
+    const { data: fPlans } = await supabase.from("fidium_plans").select("*");
+    const { data: fwgAll } = await supabase.from("fidium_white_glove_entries").select("*");
+    const { data: fidPers } = await supabase.from("fidium_personal_payscales").select("*");
+    const { data: fidMgr } = await supabase.from("fidium_manager_payscales").select("*");
+
+    const fwgByCombo = {};
+    (fwgAll || []).forEach((fwg) => {
+      const key = `${fwg.order_number}||${(fwg.requested_services || "").trim()}`;
+      fwgByCombo[key] = fwg;
+    });
+
+    const agentByFidiumId = {};
+    (agents || []).forEach((a) => {
+      if (a.fidium_identifier) {
+        agentByFidiumId[a.fidium_identifier.trim()] = a;
+      }
+    });
+
+    const fPlanByName = {};
+    (fPlans || []).forEach((p) => {
+      if (p.name) {
+        fPlanByName[p.name.trim()] = p;
+      }
+    });
+
+    const managerFor = {};
+    (agentManagers || []).forEach((am) => {
+      managerFor[am.agent_id] = am.manager_id;
+    });
+
+    const totals = {};
+    (agents || []).forEach((a) => {
+      if (a.fidium_identifier) {
+        let up = 0,
+          bp = 0;
+        if (
+          a.fidium_personal_payscale_id &&
+          fidPers.find((x) => x.id === a.fidium_personal_payscale_id)
+        ) {
+          const psObj = fidPers.find((x) => x.id === a.fidium_personal_payscale_id);
+          up = parseFloat(psObj.upfront_percentage) || 0;
+          bp = parseFloat(psObj.backend_percentage) || 0;
+        }
+        totals[a.id] = {
+          name: a.name || a.identifier,
+          accounts: 0,
+          personalTotal: 0,
+          managerTotal: 0,
+          upfront_percentage: up,
+          backend_percentage: bp,
+          details: [],
+        };
+      }
+    });
+
+    for (const row of fidiumRows) {
+      const rep = row["SALES_REP"]?.trim();
+      if (!rep) continue;
+      const agent = agentByFidiumId[rep];
+      if (!agent) continue;
+
+      const rawPlan = row["REQUESTED_SERVICES"]?.trim();
+      if (!rawPlan) continue;
+      const plan = fPlanByName[rawPlan];
+      if (!plan) continue;
+
+      const orderNum = row["ORDER_NUMBER"]?.trim();
+      const svc = row["REQUESTED_SERVICES"]?.trim();
+      const comboKey = `${orderNum}||${svc}`;
+      const fwgRow = fwgByCombo[comboKey];
+
+      const submissionDate = row["SUBMISSION_DATE"] ? new Date(row["SUBMISSION_DATE"]) : null;
+
+      // personal
+      let personalVal = 0;
+      if (agent.fidium_personal_payscale_id) {
+        personalVal = await getFidiumPersonalCommission({
+          supabase,
+          fidiumPersonalPayscaleId: agent.fidium_personal_payscale_id,
+          fidiumPlanId: plan.id,
+          submissionDate,
+        });
+        totals[agent.id].accounts++;
+        totals[agent.id].personalTotal += personalVal;
+      }
+
+      // manager
+      let managerVal = 0;
+      const mgrId = managerFor[agent.id];
+      if (mgrId) {
+        const { data: managerAgent } = await supabase
+          .from("agents")
+          .select("*")
+          .eq("id", mgrId)
+          .maybeSingle();
+
+        if (managerAgent && managerAgent.fidium_manager_payscale_id) {
+          // plan-based override
+          const overrideVal = await getFidiumManagerOverride({
+            supabase,
+            managerId: mgrId,
+            agentId: agent.id,
+            planId: plan.id,
+            submissionDate,
+          });
+          if (overrideVal !== null) {
+            managerVal = overrideVal;
+          } else {
+            // fallback to manager payscale
+            managerVal = await getFidiumManagerCommission({
+              supabase,
+              fidiumManagerPayscaleId: managerAgent.fidium_manager_payscale_id,
+              fidiumPlanId: plan.id,
+              submissionDate,
+            });
+          }
+          totals[mgrId].managerTotal += managerVal;
+        }
+      }
+
+      totals[agent.id].details.push({
+        fidium_white_glove_id: fwgRow?.id,
+        personal_commission: personalVal,
+      });
+    }
+
+    const finalReport = Object.entries(totals)
+      .filter(([_, data]) => data.accounts > 0)
+      .map(([agentId, data]) => {
+        const personalTotal = data.personalTotal;
+        const managerTotal = data.managerTotal;
+        const grandTotal = personalTotal + managerTotal;
+        const upfrontValue = personalTotal * (data.upfront_percentage / 100);
+        const backendValue = personalTotal * (data.backend_percentage / 100);
+        return {
+          agentId,
+          name: data.name,
+          accounts: data.accounts,
+          personalTotal,
+          managerTotal,
+          grandTotal,
+          upfront_percentage: data.upfront_percentage,
+          backend_percentage: data.backend_percentage,
+          upfrontValue,
+          backendValue,
+          details: data.details,
+        };
+      });
+
+    const detailMap = {};
+    for (const line of finalReport) {
+      detailMap[line.agentId] = line.details;
+    }
+    setFidiumReport(finalReport);
+    setFidiumDetails(detailMap);
+  }
+
+  async function saveFidiumReport() {
+    if (fidiumReport.length === 0) return;
+    if (!fidiumBatchName.trim()) {
+      alert("Please provide a Fidium batch name.");
+      return;
+    }
+    const { data: batchData, error: batchErr } = await supabase
+      .from("payroll_report_batches")
+      .insert([{ batch_name: fidiumBatchName }])
+      .select("*")
+      .single();
+    if (batchErr) {
+      console.error("Error creating Fidium batch:", batchErr);
+      return;
+    }
+    const batch_id = batchData.id;
+    const rows = fidiumReport.map((r) => ({
+      agent_id: r.agentId,
+      name: r.name,
+      accounts: r.accounts,
+      personal_total: r.personalTotal,
+      manager_total: r.managerTotal,
+      grand_total: r.grandTotal,
+      upfront_percentage: r.upfront_percentage,
+      backend_percentage: r.backend_percentage,
+      upfront_value: r.upfrontValue,
+      backend_value: r.backendValue,
+      batch_id,
+      frontend_is_paid: false,
+      backend_is_paid: false,
+      report_type: "fidium",
+      details: r.details,
+    }));
+    const { error } = await supabase.from("payroll_reports").insert(rows);
+    if (error) {
+      console.error("Error saving Fidium report:", error);
+      alert("Error saving Fidium report");
+    } else {
+      alert("Fidium report saved successfully!");
+      setFidiumBatchName("");
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <h3 className="text-lg font-semibold">2) Fidium CSV</h3>
+
+      <input
+        type="file"
+        ref={fidiumFileRef}
+        className="hidden"
+        onChange={(e) => setFidiumFile(e.target.files[0])}
+      />
+
+      <div className="flex items-center space-x-4 mb-4">
+        <Button onClick={handleFidiumFileClick}>Fidium CSV</Button>
+        {fidiumFile && <span className="text-sm text-gray-600">{fidiumFile.name}</span>}
+      </div>
+
+      {fidiumFile && fidiumReport.length === 0 && (
+        <Button onClick={parseFidiumFile} disabled={loading}>
+          {loading ? "Processing..." : "Generate Fidium Report"}
+        </Button>
+      )}
+
+      {fidiumReport.length > 0 && (
+        <div className="mt-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4">
+            <h3 className="text-lg font-bold">Fidium Report</h3>
+            <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+              <Input
+                placeholder="Fidium Batch Name"
+                value={fidiumBatchName}
+                onChange={(e) => setFidiumBatchName(e.target.value)}
+              />
+              <Button onClick={saveFidiumReport}>Save Fidium Report</Button>
+            </div>
+          </div>
+
+          <Table striped>
+            <TableHead>
+              <TableRow>
+                <TableHeader />
+                <TableHeader>Name</TableHeader>
+                <TableHeader># Accounts</TableHeader>
+                <TableHeader>Personal Total</TableHeader>
+                <TableHeader>Manager Total</TableHeader>
+                <TableHeader>Upfront</TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {fidiumReport.map((fr) => {
+                const isExpanded = expandedFidium.has(fr.agentId);
+                return (
+                  <React.Fragment key={fr.agentId}>
+                    <TableRow>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="plain"
+                          onClick={() => toggleFidiumExpand(fr.agentId)}
+                        >
+                          {isExpanded ? (
+                            <ChevronUpIcon className="h-5 w-5" />
+                          ) : (
+                            <ChevronDownIcon className="h-5 w-5" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell>{fr.name}</TableCell>
+                      <TableCell>{fr.accounts}</TableCell>
+                      <TableCell>${fr.personalTotal.toFixed(2)}</TableCell>
+                      <TableCell>
+                        {fr.managerTotal > 0 ? `$${fr.managerTotal.toFixed(2)}` : "N/A"}
+                      </TableCell>
+                      <TableCell>
+                        {fr.upfrontValue !== null
+                          ? `$${fr.upfrontValue.toFixed(2)} (${fr.upfront_percentage}%)`
+                          : "N/A"}
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="bg-gray-50">
+                          <div className="p-4">
+                            <h4 className="font-bold mb-2">Fidium Details</h4>
+                            <Table striped>
+                              <TableHead>
+                                <TableRow>
+                                  <TableHeader>Fidium WG ID</TableHeader>
+                                  <TableHeader>Personal Commission</TableHeader>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {(fidiumDetails[fr.agentId] || []).map((d, idx) => (
+                                  <TableRow key={idx}>
+                                    <TableCell>{d.fidium_white_glove_id}</TableCell>
+                                    <TableCell>
+                                      ${d.personal_commission.toFixed(2)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+// app/protected/payroll/NormalFlow.jsx
+"use client";
+
+import React, { useState, useRef } from "react";
+import Papa from "papaparse";
+import { createClient } from "@/utils/supabase/client";
+import "tailwindcss/tailwind.css";
+import { Button } from "@/components/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/table";
+import { Input } from "@/components/input";
+import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/20/solid";
+
+/**
+ * Retrieves the manager->agent->plan override (if any).
+ * Then checks if there's a date-range override for that plan, covering submissionDate.
+ * If found, returns that plan’s override commission. Otherwise returns the base override.
+ * If no plan-level override record at all, returns null.
+ */
+async function getManagerOverrideCommission({
+  supabase,
+  managerId,
+  agentId,
+  planId,
+  submissionDate,
+  isUpgrade,
+}) {
+  if (!managerId || !agentId || !planId) return null;
+
+  // 1) fetch override record (manager->agent->plan)
+  const { data: overrideRows } = await supabase
+    .from("manager_agent_commissions")
+    .select("id, manager_commission_value, manager_upgrade_commission_value")
+    .eq("manager_id", managerId)
+    .eq("agent_id", agentId)
+    .eq("plan_id", planId);
+
+  if (!overrideRows || overrideRows.length === 0) return null;
+
+  const override = overrideRows[0]; // typically only one
+  const baseVal = isUpgrade
+    ? override.manager_upgrade_commission_value
+    : override.manager_commission_value;
+
+  // 2) fetch date-range rows
+  const { data: rangeRows } = await supabase
+    .from("manager_agent_commission_date_ranges")
+    .select("*")
+    .eq("manager_agent_commission_id", override.id)
+    .eq("plan_id", planId); // must match the same plan
+
+  if (!rangeRows || rangeRows.length === 0) {
+    return baseVal;
+  }
+
+  const subDateObj = submissionDate instanceof Date ? submissionDate : new Date(submissionDate);
+  let matchedRange = null;
+  for (const rr of rangeRows) {
+    const start = new Date(rr.start_date);
+    const end = rr.end_date ? new Date(rr.end_date) : null;
+    if (subDateObj >= start && (!end || subDateObj <= end)) {
+      if (!matchedRange) {
+        matchedRange = rr;
+      } else {
+        // pick the one with the latest start_date <= subDateObj
+        if (new Date(rr.start_date) > new Date(matchedRange.start_date)) {
+          matchedRange = rr;
+        }
+      }
+    }
+  }
+  if (matchedRange) {
+    return isUpgrade
+      ? matchedRange.manager_upgrade_commission_value
+      : matchedRange.manager_commission_value;
+  }
+  return baseVal;
+}
+
+export default function NormalFlow({ supabase }) {
+  const [fileNewInstalls, setFileNewInstalls] = useState(null);
+  const [fileWhiteGlove, setFileWhiteGlove] = useState(null);
+  const [fileMigrations, setFileMigrations] = useState(null);
+
+  const refNewInstalls = useRef(null);
+  const refWhiteGlove = useRef(null);
+  const refMigrations = useRef(null);
+
+  const [report, setReport] = useState([]);
+  const [reportDetails, setReportDetails] = useState({});
+  const [expandedAgents, setExpandedAgents] = useState(new Set());
+  const [batchName, setBatchName] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleNewInstallsClick = () => refNewInstalls.current.click();
+  const handleWhiteGloveClick = () => refWhiteGlove.current.click();
+  const handleMigrationsClick = () => refMigrations.current.click();
+
+  const allThreeFilesAreSelected =
+    fileNewInstalls && fileWhiteGlove && fileMigrations && report.length === 0;
+
+  async function getPersonalCommission({
+    personalPayscaleId,
+    planId,
+    isUpgrade,
+    submissionDate,
+  }) {
+    const { data: dateRanges } = await supabase
+      .from("personal_payscale_date_ranges")
+      .select("id, start_date, end_date, personal_payscale_date_range_plan_commissions(*)")
+      .eq("personal_payscale_id", personalPayscaleId);
+
+    if (!dateRanges || dateRanges.length === 0) {
+      const { data: baseComm } = await supabase
+        .from("personal_payscale_plan_commissions")
+        .select("*")
+        .eq("personal_payscale_id", personalPayscaleId)
+        .eq("plan_id", planId)
+        .single();
+      if (!baseComm) return 0;
+      return isUpgrade
+        ? baseComm.rep_upgrade_commission_value
+        : baseComm.rep_commission_value;
+    }
+
+    const subDateObj = new Date(submissionDate);
+    let matchedRange = null;
+    for (const dr of dateRanges) {
+      const start = new Date(dr.start_date);
+      const end = dr.end_date ? new Date(dr.end_date) : null;
+      if (subDateObj >= start && (!end || subDateObj <= end)) {
+        if (!matchedRange) {
+          matchedRange = dr;
+        } else if (new Date(dr.start_date) > new Date(matchedRange.start_date)) {
+          matchedRange = dr;
+        }
+      }
+    }
+    if (matchedRange) {
+      const pc = matchedRange.personal_payscale_date_range_plan_commissions.find(
+        (x) => x.plan_id === planId
+      );
+      if (!pc) return 0;
+      return isUpgrade ? pc.rep_upgrade_commission_value : pc.rep_commission_value;
+    } else {
+      const { data: baseComm } = await supabase
+        .from("personal_payscale_plan_commissions")
+        .select("*")
+        .eq("personal_payscale_id", personalPayscaleId)
+        .eq("plan_id", planId)
+        .single();
+      if (!baseComm) return 0;
+      return isUpgrade
+        ? baseComm.rep_upgrade_commission_value
+        : baseComm.rep_commission_value;
+    }
+  }
+
+  async function getManagerCommission({
+    managerPayscaleId,
+    planId,
+    isUpgrade,
+    submissionDate,
+  }) {
+    const { data: dateRanges } = await supabase
+      .from("manager_payscale_date_ranges")
+      .select("id, start_date, end_date, manager_payscale_date_range_plan_commissions(*)")
+      .eq("manager_payscale_id", managerPayscaleId);
+
+    if (!dateRanges || dateRanges.length === 0) {
+      const { data: baseComm } = await supabase
+        .from("manager_payscale_plan_commissions")
+        .select("*")
+        .eq("manager_payscale_id", managerPayscaleId)
+        .eq("plan_id", planId)
+        .single();
+      if (!baseComm) return 0;
+      return isUpgrade
+        ? baseComm.manager_upgrade_commission_value
+        : baseComm.manager_commission_value;
+    }
+
+    const subDateObj = new Date(submissionDate);
+    let matchedRange = null;
+    for (const dr of dateRanges) {
+      const start = new Date(dr.start_date);
+      const end = dr.end_date ? new Date(dr.end_date) : null;
+      if (subDateObj >= start && (!end || subDateObj <= end)) {
+        if (!matchedRange) {
+          matchedRange = dr;
+        } else if (new Date(dr.start_date) > new Date(matchedRange.start_date)) {
+          matchedRange = dr;
+        }
+      }
+    }
+
+    if (matchedRange) {
+      const pc = matchedRange.manager_payscale_date_range_plan_commissions.find(
+        (x) => x.plan_id === planId
+      );
+      if (!pc) return 0;
+      return isUpgrade
+        ? pc.manager_upgrade_commission_value
+        : pc.manager_commission_value;
+    } else {
+      const { data: baseComm } = await supabase
+        .from("manager_payscale_plan_commissions")
+        .select("*")
+        .eq("manager_payscale_id", managerPayscaleId)
+        .eq("plan_id", planId)
+        .single();
+      if (!baseComm) return 0;
+      return isUpgrade
+        ? baseComm.manager_upgrade_commission_value
+        : baseComm.manager_commission_value;
+    }
+  }
+
+  async function parseAllNormalFiles() {
+    if (!fileNewInstalls || !fileWhiteGlove || !fileMigrations) {
+      alert("Please select New Installs, White Glove, AND Migrations CSVs.");
+      return;
+    }
+    setLoading(true);
+
+    Papa.parse(fileNewInstalls, {
+      header: true,
+      complete: (resNew) => {
+        Papa.parse(fileWhiteGlove, {
+          header: true,
+          complete: (resWg) => {
+            Papa.parse(fileMigrations, {
+              header: true,
+              complete: async (resMig) => {
+                try {
+                  const newInstallsRows = resNew.data || [];
+                  const whiteGloveRows = resWg.data || [];
+                  const migrationsRows = resMig.data || [];
+
+                  await upsertPlansFromCSV(newInstallsRows, whiteGloveRows);
+                  await upsertPlansFromCSV(migrationsRows, whiteGloveRows);
+
+                  const wgMap = {};
+                  whiteGloveRows.forEach((row) => {
+                    if (row["Order Number"]) {
+                      wgMap[row["Order Number"].trim()] = row;
+                    }
+                  });
+
+                  const matchedNewInstalls = newInstallsRows
+                    .filter((r) => r["Order Id"] && wgMap[r["Order Id"].trim()])
+                    .map((r) => ({
+                      ...r,
+                      matchedWhiteGlove: wgMap[r["Order Id"].trim()],
+                      isUpgrade: false,
+                    }));
+
+                  const matchedMigrations = migrationsRows
+                    .filter((r) => r["Order Id"] && wgMap[r["Order Id"].trim()])
+                    .map((r) => ({
+                      ...r,
+                      matchedWhiteGlove: wgMap[r["Order Id"].trim()],
+                      isUpgrade: true,
+                    }));
+
+                  const allMatched = [...matchedNewInstalls, ...matchedMigrations];
+
+                  await upsertAgentsFromMatches(allMatched);
+
+                  await generateNormalReport(allMatched);
+                } catch (err) {
+                  console.error("Error processing normal/migrations files:", err);
+                  alert("Error processing normal/migrations files");
+                } finally {
+                  setLoading(false);
+                }
+              },
+            });
+          },
+        });
+      },
+    });
+  }
+
+  async function upsertPlansFromCSV(csvRows, whiteGloveRows) {
+    const planMap = {};
+    for (const row of csvRows) {
+      const planName = row["Plan Name"]?.trim();
+      const payoutStr = row["Payout"]?.replace("$", "").replace(",", "");
+      if (planName && payoutStr) {
+        const val = parseFloat(payoutStr);
+        if (!isNaN(val)) {
+          planMap[planName] = val;
+        }
+      }
+    }
+    const wgPlanSet = new Set();
+    for (const row of whiteGloveRows) {
+      const speed = row["Internet Speed"]?.trim();
+      if (speed) wgPlanSet.add(speed);
+    }
+    for (const planName of Object.keys(planMap)) {
+      await supabase
+        .from("plans")
+        .upsert([{ name: planName, commission_amount: planMap[planName] }], {
+          onConflict: "name",
+        });
+    }
+    for (const planName of wgPlanSet) {
+      await supabase
+        .from("plans")
+        .upsert([{ name: planName, commission_amount: 0 }], {
+          onConflict: "name",
+        });
+    }
+  }
+
+  async function upsertAgentsFromMatches(matchedRows) {
+    const agentsMap = {};
+    for (const row of matchedRows) {
+      const wg = row.matchedWhiteGlove;
+      const agentInfo = wg["Agent Seller Information"]?.trim();
+      if (agentInfo && agentsMap[agentInfo] === undefined) {
+        const idx = agentInfo.indexOf(":");
+        const name = idx >= 0 ? agentInfo.slice(idx + 1).trim() : agentInfo;
+        agentsMap[agentInfo] = name;
+      }
+    }
+    const toInsert = Object.entries(agentsMap).map(([identifier, name]) => ({
+      identifier,
+      name,
+    }));
+    for (const entry of toInsert) {
+      await supabase.from("agents").upsert([entry], { onConflict: "identifier" });
+    }
+  }
+
+  async function generateNormalReport(matchedRows) {
+    const { data: agents } = await supabase.from("agents").select("*");
+    const { data: agentManagers } = await supabase.from("agent_managers").select("*");
+    const { data: plans } = await supabase.from("plans").select("*");
+    const { data: wgeData } = await supabase.from("white_glove_entries").select("*");
+
+    const personalPsById = {};
+    const { data: personalPayscales } = await supabase.from("personal_payscales").select("*");
+    (personalPayscales || []).forEach((p) => {
+      personalPsById[p.id] = p;
+    });
+
+    const managerForAgent = {};
+    (agentManagers || []).forEach((am) => {
+      managerForAgent[am.agent_id] = am.manager_id;
+    });
+
+    const wgeByOrder = {};
+    (wgeData || []).forEach((w) => {
+      if (w.order_number) {
+        wgeByOrder[w.order_number.trim()] = w;
+      }
+    });
+
+    const totals = {};
+    (agents || []).forEach((a) => {
+      let up = null,
+        bp = null;
+      if (a.personal_payscale_id && personalPsById[a.personal_payscale_id]) {
+        const ps = personalPsById[a.personal_payscale_id];
+        up = parseFloat(ps.upfront_percentage);
+        bp = parseFloat(ps.backend_percentage);
+      }
+      totals[a.id] = {
+        name: a.name || a.identifier,
+        accounts: 0,
+        personalTotal: 0,
+        managerTotal: 0,
+        upfront_percentage: isNaN(up) ? null : up,
+        backend_percentage: isNaN(bp) ? null : bp,
+        details: [],
+      };
+    });
+
+    for (const row of matchedRows) {
+      const wg = row.matchedWhiteGlove;
+      if (!wg) continue;
+
+      const agentInfo = wg["Agent Seller Information"]?.trim();
+      const speed = wg["Internet Speed"]?.trim();
+      if (!agentInfo || !speed) continue;
+
+      const agent = (agents || []).find(
+        (a) => a.identifier && a.identifier.trim() === agentInfo
+      );
+      if (!agent) continue;
+
+      const plan = (plans || []).find((p) => p.name && p.name.trim() === speed);
+      if (!plan) continue;
+
+      const isUpgrade = row.isUpgrade === true;
+
+      const wgeRow = wgeByOrder[wg["Order Number"]?.trim()] || null;
+      const submissionDate = wgeRow?.order_submission_date || null;
+
+      // 1) personal
+      let personalVal = 0;
+      if (agent.personal_payscale_id) {
+        personalVal = await getPersonalCommission({
+          personalPayscaleId: agent.personal_payscale_id,
+          planId: plan.id,
+          isUpgrade,
+          submissionDate,
+        });
+        totals[agent.id].accounts++;
+        totals[agent.id].personalTotal += personalVal;
+      }
+
+      // 2) manager
+      let managerVal = 0;
+      const mgrId = managerForAgent[agent.id];
+      if (mgrId) {
+        // first check override (plan-based)
+        const overrideVal = await getManagerOverrideCommission({
+          supabase,
+          managerId: mgrId,
+          agentId: agent.id,
+          planId: plan.id,
+          submissionDate,
+          isUpgrade,
+        });
+        if (overrideVal !== null) {
+          managerVal = overrideVal;
+        } else {
+          // fallback to manager's plan-based payscale
+          const { data: managerAgent } = await supabase
+            .from("agents")
+            .select("*")
+            .eq("id", mgrId)
+            .maybeSingle();
+          if (managerAgent && managerAgent.manager_payscale_id) {
+            managerVal = await getManagerCommission({
+              managerPayscaleId: managerAgent.manager_payscale_id,
+              planId: plan.id,
+              isUpgrade,
+              submissionDate,
+            });
+          }
+        }
+        totals[mgrId].managerTotal += managerVal;
+      }
+
+      totals[agent.id].details.push({
+        white_glove_entry_id: wgeRow?.id,
+        personal_commission: personalVal,
+        is_upgrade: isUpgrade,
+      });
+    }
+
+    const finalReport = Object.entries(totals)
+      .filter(([_, data]) => data.accounts > 0)
+      .map(([agentId, data]) => {
+        const personalTotal = data.personalTotal;
+        const managerTotal = data.managerTotal;
+        const grandTotal = personalTotal + managerTotal;
+        let upfrontValue = null;
+        if (data.upfront_percentage !== null && !isNaN(data.upfront_percentage)) {
+          upfrontValue = personalTotal * (data.upfront_percentage / 100);
+        }
+        let backendValue = null;
+        if (data.backend_percentage !== null && !isNaN(data.backend_percentage)) {
+          backendValue = personalTotal * (data.backend_percentage / 100);
+        }
+        return {
+          agentId,
+          name: data.name,
+          accounts: data.accounts,
+          personalTotal,
+          managerTotal,
+          grandTotal,
+          upfront_percentage: data.upfront_percentage,
+          backend_percentage: data.backend_percentage,
+          upfrontValue,
+          backendValue,
+          details: data.details,
+        };
+      });
+
+    const detailMap = {};
+    for (const line of finalReport) {
+      detailMap[line.agentId] = line.details;
+    }
+    setReport(finalReport);
+    setReportDetails(detailMap);
+  }
+
+  async function saveNormalReport() {
+    if (report.length === 0) return;
+    if (!batchName.trim()) {
+      alert("Please provide a batch name.");
+      return;
+    }
+    const { data: batchData, error: batchErr } = await supabase
+      .from("payroll_report_batches")
+      .insert([{ batch_name: batchName }])
+      .select("*")
+      .single();
+    if (batchErr) {
+      console.error("Error creating normal batch:", batchErr);
+      return;
+    }
+    const batch_id = batchData.id;
+    const rows = report.map((r) => ({
+      agent_id: r.agentId,
+      name: r.name,
+      accounts: r.accounts,
+      personal_total: r.personalTotal,
+      manager_total: r.managerTotal,
+      grand_total: r.grandTotal,
+      upfront_percentage: r.upfront_percentage,
+      backend_percentage: r.backend_percentage,
+      upfront_value: r.upfrontValue,
+      backend_value: r.backendValue,
+      batch_id,
+      frontend_is_paid: false,
+      backend_is_paid: false,
+      report_type: "normal",
+      details: r.details,
+    }));
+    const { error } = await supabase.from("payroll_reports").insert(rows);
+    if (error) {
+      console.error("Error saving normal report:", error);
+      alert("Error saving normal report");
+    } else {
+      alert("Normal report saved successfully!");
+      setBatchName("");
+    }
+  }
+
+  function toggleExpand(agentId) {
+    setExpandedAgents((prev) => {
+      const newSet = new Set(prev);
+      newSet.has(agentId) ? newSet.delete(agentId) : newSet.add(agentId);
+      return newSet;
+    });
+  }
+
+  return (
+    <div className="space-y-6">
+      <h3 className="text-lg font-semibold mt-4">1) Normal CSVs (3 required)</h3>
+
+      <input
+        type="file"
+        ref={refNewInstalls}
+        className="hidden"
+        onChange={(e) => setFileNewInstalls(e.target.files[0])}
+      />
+      <input
+        type="file"
+        ref={refWhiteGlove}
+        className="hidden"
+        onChange={(e) => setFileWhiteGlove(e.target.files[0])}
+      />
+      <input
+        type="file"
+        ref={refMigrations}
+        className="hidden"
+        onChange={(e) => setFileMigrations(e.target.files[0])}
+      />
+
+      <div className="flex items-center space-x-4 mb-4">
+        <Button onClick={handleNewInstallsClick}>New Installs CSV</Button>
+        {fileNewInstalls && <span className="text-sm text-gray-600">{fileNewInstalls.name}</span>}
+
+        <Button onClick={handleWhiteGloveClick}>White Glove CSV</Button>
+        {fileWhiteGlove && <span className="text-sm text-gray-600">{fileWhiteGlove.name}</span>}
+
+        <Button onClick={handleMigrationsClick}>Migrations CSV</Button>
+        {fileMigrations && <span className="text-sm text-gray-600">{fileMigrations.name}</span>}
+      </div>
+
+      {allThreeFilesAreSelected && (
+        <Button onClick={parseAllNormalFiles} disabled={loading}>
+          {loading ? "Processing..." : "Generate Normal Report"}
+        </Button>
+      )}
+
+      {report.length > 0 && (
+        <div className="mt-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4">
+            <h3 className="text-lg font-bold">Normal Payroll Report</h3>
+            <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+              <Input
+                placeholder="Batch Name"
+                value={batchName}
+                onChange={(e) => setBatchName(e.target.value)}
+              />
+              <Button onClick={saveNormalReport}>Save Report</Button>
+            </div>
+          </div>
+
+          <Table striped>
+            <TableHead>
+              <TableRow>
+                <TableHeader />
+                <TableHeader>Name</TableHeader>
+                <TableHeader># Accounts</TableHeader>
+                <TableHeader>Personal Total</TableHeader>
+                <TableHeader>Manager Total</TableHeader>
+                <TableHeader>Upfront</TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {report.map((r) => {
+                const isExpanded = expandedAgents.has(r.agentId);
+                return (
+                  <React.Fragment key={r.agentId}>
+                    <TableRow>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="plain"
+                          onClick={() => toggleExpand(r.agentId)}
+                        >
+                          {isExpanded ? (
+                            <ChevronUpIcon className="h-5 w-5" />
+                          ) : (
+                            <ChevronDownIcon className="h-5 w-5" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell>{r.name}</TableCell>
+                      <TableCell>{r.accounts}</TableCell>
+                      <TableCell>${r.personalTotal.toFixed(2)}</TableCell>
+                      <TableCell>
+                        {r.managerTotal > 0 ? `$${r.managerTotal.toFixed(2)}` : "N/A"}
+                      </TableCell>
+                      <TableCell>
+                        {r.upfrontValue !== null
+                          ? `$${r.upfrontValue.toFixed(2)} (${r.upfront_percentage}%)`
+                          : "N/A"}
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="bg-gray-50">
+                          <div className="p-4">
+                            <h4 className="font-bold mb-2">Sales Details</h4>
+                            <Table striped>
+                              <TableHead>
+                                <TableRow>
+                                  <TableHeader>White Glove ID</TableHeader>
+                                  <TableHeader>Personal Commission</TableHeader>
+                                  <TableHeader>Is Upgrade?</TableHeader>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {reportDetails[r.agentId]?.map((d, idx) => (
+                                  <TableRow key={idx}>
+                                    <TableCell>{d.white_glove_entry_id}</TableCell>
+                                    <TableCell>${d.personal_commission.toFixed(2)}</TableCell>
+                                    <TableCell>{d.is_upgrade ? "Yes" : "No"}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+// app/protected/payroll/page.jsx
+"use client";
+
+import React, { useMemo } from "react";
+import { createClient } from "@/utils/supabase/client";
+import NormalFlow from "./NormalFlow";
+import FidiumFlow from "./FidiumFlow";
+
+export default function PayrollTab() {
+  // Create supabase client once, pass down to flows
+  const supabase = useMemo(() => createClient(), []);
+
+  return (
+    <div className="p-6 space-y-6 font-sans text-gray-900">
+      <h2 className="text-2xl font-bold">Payroll Report Generator (Normal + Fidium)</h2>
+
+      {/* Normal Flow Component */}
+      <NormalFlow supabase={supabase} />
+
+      <hr className="my-6" />
+
+      {/* Fidium Flow Component */}
+      <FidiumFlow supabase={supabase} />
+    </div>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/AddAgentModal.jsx
+"use client";
+
+import { useState } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Select } from "@/components/select";
+import { Checkbox, CheckboxField } from "@/components/checkbox";
+import { Button } from "@/components/button";
+
+export default function AddAgentModal({
+  supabase,
+  personalPayscales,
+  managerPayscales,
+  fidiumPersonalPayscales,
+  fidiumManagerPayscales,
+  onClose,
+}) {
+  const [form, setForm] = useState({
+    name: "",
+    identifier: "",
+    fidium_identifier: "",
+    is_manager: false,
+    personal_payscale_id: "",
+    manager_payscale_id: "",
+    fidium_personal_payscale_id: "",
+    fidium_manager_payscale_id: "",
+  });
+
+  async function addAgent() {
+    if (!form.name.trim() || !form.identifier.trim()) return;
+    await supabase.from("agents").insert([
+      {
+        name: form.name.trim(),
+        identifier: form.identifier.trim(),
+        fidium_identifier: form.fidium_identifier.trim() || null,
+        is_manager: form.is_manager,
+        personal_payscale_id: form.personal_payscale_id || null,
+        manager_payscale_id: form.is_manager ? form.manager_payscale_id || null : null,
+        fidium_personal_payscale_id: form.fidium_personal_payscale_id || null,
+        fidium_manager_payscale_id: form.is_manager
+          ? form.fidium_manager_payscale_id || null
+          : null,
+      },
+    ]);
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Add Agent</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </Field>
+
+        <Field className="mb-4">
+          <Label>Identifier</Label>
+          <Input
+            value={form.identifier}
+            onChange={(e) => setForm({ ...form, identifier: e.target.value })}
+          />
+        </Field>
+
+        <Field className="mb-4">
+          <Label>Fidium Identifier</Label>
+          <Input
+            value={form.fidium_identifier}
+            onChange={(e) => setForm({ ...form, fidium_identifier: e.target.value })}
+          />
+        </Field>
+
+        <CheckboxField className="mb-4">
+          <Checkbox
+            checked={form.is_manager}
+            onChange={(val) => setForm({ ...form, is_manager: val })}
+          />
+          <Label>Is Manager?</Label>
+        </CheckboxField>
+
+        <Field className="mb-4">
+          <Label>Personal Payscale</Label>
+          <Select
+            value={form.personal_payscale_id}
+            onChange={(e) => setForm({ ...form, personal_payscale_id: e.target.value })}
+          >
+            <option value="">(None)</option>
+            {personalPayscales.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        {form.is_manager && (
+          <Field className="mb-4">
+            <Label>Manager Payscale</Label>
+            <Select
+              value={form.manager_payscale_id}
+              onChange={(e) => setForm({ ...form, manager_payscale_id: e.target.value })}
+            >
+              <option value="">(None)</option>
+              {managerPayscales.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+
+        <Field className="mb-4">
+          <Label>Fidium Personal Payscale</Label>
+          <Select
+            value={form.fidium_personal_payscale_id}
+            onChange={(e) =>
+              setForm({ ...form, fidium_personal_payscale_id: e.target.value })
+            }
+          >
+            <option value="">(None)</option>
+            {fidiumPersonalPayscales.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        {form.is_manager && (
+          <Field className="mb-4">
+            <Label>Fidium Manager Payscale</Label>
+            <Select
+              value={form.fidium_manager_payscale_id}
+              onChange={(e) =>
+                setForm({ ...form, fidium_manager_payscale_id: e.target.value })
+              }
+            >
+              <option value="">(None)</option>
+              {fidiumManagerPayscales.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={addAgent}>Add</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/AddFidiumManagerModal.jsx
+"use client";
+
+import { useState } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+import DateRangeManagerFidium from "./DateRangeManagerFidium";
+
+export default function AddFidiumManagerModal({ fidiumPlans, supabase, onClose }) {
+  const [form, setForm] = useState({
+    name: "",
+    commissions: {},
+  });
+  const [dateRanges, setDateRanges] = useState([]);
+
+  function updateCommission(planId, value) {
+    setForm((prev) => ({
+      ...prev,
+      commissions: { ...prev.commissions, [planId]: value },
+    }));
+  }
+
+  async function addPayscale() {
+    if (!form.name.trim()) return;
+    // Insert payscale
+    const { data: inserted } = await supabase
+      .from("fidium_manager_payscales")
+      .insert([{ name: form.name.trim() }])
+      .select("*")
+      .single();
+    if (!inserted) return;
+
+    // Insert base commissions
+    const arr = fidiumPlans.map((fp) => ({
+      fidium_manager_payscale_id: inserted.id,
+      fidium_plan_id: fp.id,
+      manager_commission_type: "fixed_amount",
+      manager_commission_value: parseFloat(form.commissions[fp.id] || "0"),
+    }));
+    await supabase.from("fidium_manager_payscale_plan_commissions").insert(arr);
+
+    // Insert date ranges
+    for (const dr of dateRanges) {
+      const { data: insertedRange } = await supabase
+        .from("fidium_manager_payscale_date_ranges")
+        .insert([
+          {
+            fidium_manager_payscale_id: inserted.id,
+            start_date: dr.start_date,
+            end_date: dr.end_date || null,
+          },
+        ])
+        .select("*")
+        .single();
+      if (!insertedRange) continue;
+
+      const planCommArr = [];
+      for (const fp of fidiumPlans) {
+        const baseVal = dr.planValues[fp.id]?.base || "0";
+        planCommArr.push({
+          fidium_manager_payscale_date_range_id: insertedRange.id,
+          fidium_plan_id: fp.id,
+          manager_commission_type: "fixed_amount",
+          manager_commission_value: parseFloat(baseVal),
+        });
+      }
+      await supabase
+        .from("fidium_manager_payscale_date_range_plan_commissions")
+        .insert(planCommArr);
+    }
+
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Add Fidium Manager Payscale</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Payscale Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </Field>
+        <h3 className="font-semibold mb-2">Base Commissions (Fidium plans)</h3>
+        {fidiumPlans.map((fp) => (
+          <Field key={fp.id} className="mb-2 flex items-center">
+            <Label className="w-1/2">{fp.name}</Label>
+            <div className="w-1/2 flex items-center">
+              <span className="mr-2">$</span>
+              <Input
+                type="number"
+                value={form.commissions[fp.id] || ""}
+                onChange={(e) => updateCommission(fp.id, e.target.value)}
+              />
+            </div>
+          </Field>
+        ))}
+
+        <hr className="my-4" />
+
+        <DateRangeManagerFidium
+          fidiumPlans={fidiumPlans}
+          dateRanges={dateRanges}
+          setDateRanges={setDateRanges}
+          label="Add Date Ranges for Additional Commission Rules"
+        />
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={addPayscale}>Add</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/AddFidiumPersonalModal.jsx
+"use client";
+
+import { useState } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+import DateRangeManagerFidium from "./DateRangeManagerFidium";
+
+export default function AddFidiumPersonalModal({ fidiumPlans, supabase, onClose }) {
+  const [form, setForm] = useState({
+    name: "",
+    upfront_percentage: "",
+    backend_percentage: "",
+    commissions: {},
+  });
+
+  const [dateRanges, setDateRanges] = useState([]);
+
+  function updateCommission(planId, value) {
+    setForm((prev) => ({
+      ...prev,
+      commissions: { ...prev.commissions, [planId]: value },
+    }));
+  }
+
+  async function addPayscale() {
+    if (!form.name.trim()) return;
+    const up = parseFloat(form.upfront_percentage) || 0;
+    const bp = parseFloat(form.backend_percentage) || 0;
+
+    // Insert payscale
+    const { data: inserted } = await supabase
+      .from("fidium_personal_payscales")
+      .insert([{ name: form.name.trim(), upfront_percentage: up, backend_percentage: bp }])
+      .select("*")
+      .single();
+    if (!inserted) return;
+
+    // Insert base commissions
+    const arr = fidiumPlans.map((fp) => ({
+      fidium_personal_payscale_id: inserted.id,
+      fidium_plan_id: fp.id,
+      rep_commission_type: "fixed_amount",
+      rep_commission_value: parseFloat(form.commissions[fp.id] || "0"),
+    }));
+    await supabase.from("fidium_personal_payscale_plan_commissions").insert(arr);
+
+    // Insert date ranges
+    for (const dr of dateRanges) {
+      const { data: insertedRange } = await supabase
+        .from("fidium_personal_payscale_date_ranges")
+        .insert([
+          {
+            fidium_personal_payscale_id: inserted.id,
+            start_date: dr.start_date,
+            end_date: dr.end_date || null,
+          },
+        ])
+        .select("*")
+        .single();
+      if (!insertedRange) continue;
+
+      const planCommArr = [];
+      for (const fp of fidiumPlans) {
+        const baseVal = dr.planValues[fp.id]?.base || "0";
+        planCommArr.push({
+          fidium_personal_payscale_date_range_id: insertedRange.id,
+          fidium_plan_id: fp.id,
+          rep_commission_type: "fixed_amount",
+          rep_commission_value: parseFloat(baseVal),
+        });
+      }
+      await supabase
+        .from("fidium_personal_payscale_date_range_plan_commissions")
+        .insert(planCommArr);
+    }
+
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Add Fidium Personal Payscale</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Payscale Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </Field>
+
+        <div className="flex space-x-4 mb-4">
+          <Field className="w-1/2">
+            <Label>Upfront (%)</Label>
+            <Input
+              type="number"
+              value={form.upfront_percentage}
+              onChange={(e) =>
+                setForm({ ...form, upfront_percentage: e.target.value })
+              }
+            />
+          </Field>
+          <Field className="w-1/2">
+            <Label>Backend (%)</Label>
+            <Input
+              type="number"
+              value={form.backend_percentage}
+              onChange={(e) =>
+                setForm({ ...form, backend_percentage: e.target.value })
+              }
+            />
+          </Field>
+        </div>
+
+        <h3 className="font-semibold mb-2">Base Commissions (per Fidium plan)</h3>
+        {fidiumPlans.map((fp) => (
+          <Field key={fp.id} className="mb-2 flex items-center">
+            <Label className="w-1/2">{fp.name}</Label>
+            <div className="w-1/2 flex items-center">
+              <span className="mr-2">$</span>
+              <Input
+                type="number"
+                value={form.commissions[fp.id] || ""}
+                onChange={(e) => updateCommission(fp.id, e.target.value)}
+              />
+            </div>
+          </Field>
+        ))}
+
+        <hr className="my-4" />
+
+        <DateRangeManagerFidium
+          fidiumPlans={fidiumPlans}
+          dateRanges={dateRanges}
+          setDateRanges={setDateRanges}
+          label="Add Date Ranges for Additional Commission Rules"
+        />
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={addPayscale}>Add</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/AddManagerPayscaleModal.jsx
+"use client";
+
+import { useState } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+import DateRangeManager from "./DateRangeManager";
+
+export default function AddManagerPayscaleModal({ plans, supabase, onClose }) {
+  const [form, setForm] = useState({
+    name: "",
+    commissions: {},
+    upgradeCommissions: {},
+  });
+
+  const [dateRanges, setDateRanges] = useState([]);
+
+  function updateCommission(planId, value, isUpgrade = false) {
+    if (isUpgrade) {
+      setForm((prev) => ({
+        ...prev,
+        upgradeCommissions: { ...prev.upgradeCommissions, [planId]: value },
+      }));
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        commissions: { ...prev.commissions, [planId]: value },
+      }));
+    }
+  }
+
+  async function addPayscale() {
+    if (!form.name.trim()) return;
+
+    // 1) Insert payscale
+    const { data: inserted } = await supabase
+      .from("manager_payscales")
+      .insert([{ name: form.name.trim() }])
+      .select("*")
+      .single();
+    if (!inserted) return;
+
+    // 2) Insert base commissions
+    const arr = plans.map((p) => ({
+      manager_payscale_id: inserted.id,
+      plan_id: p.id,
+      manager_commission_type: "fixed_amount",
+      manager_commission_value: parseFloat(form.commissions[p.id] || "0"),
+      manager_upgrade_commission_type: "fixed_amount",
+      manager_upgrade_commission_value: parseFloat(form.upgradeCommissions[p.id] || "0"),
+    }));
+    await supabase.from("manager_payscale_plan_commissions").insert(arr);
+
+    // 3) Insert date range overrides
+    for (const dr of dateRanges) {
+      const { data: insertedRange } = await supabase
+        .from("manager_payscale_date_ranges")
+        .insert([
+          {
+            manager_payscale_id: inserted.id,
+            start_date: dr.start_date,
+            end_date: dr.end_date || null,
+          },
+        ])
+        .select("*")
+        .single();
+      if (!insertedRange) continue;
+
+      const planCommArr = [];
+      for (const p of plans) {
+        const valObj = dr.planValues[p.id] || { base: "0", upgrade: "0" };
+        planCommArr.push({
+          manager_payscale_date_range_id: insertedRange.id,
+          plan_id: p.id,
+          manager_commission_type: "fixed_amount",
+          manager_commission_value: parseFloat(valObj.base || "0"),
+          manager_upgrade_commission_type: "fixed_amount",
+          manager_upgrade_commission_value: parseFloat(valObj.upgrade || "0"),
+        });
+      }
+      await supabase
+        .from("manager_payscale_date_range_plan_commissions")
+        .insert(planCommArr);
+    }
+
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Add Manager Payscale</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Payscale Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </Field>
+
+        <h3 className="font-semibold mb-2">Base Commissions (per plan)</h3>
+        {plans.map((p) => (
+          <div key={p.id} className="border p-2 mb-2 rounded">
+            <div className="font-medium mb-1">{p.name}</div>
+            <Field className="flex items-center mb-2">
+              <Label className="w-1/3">Base ($)</Label>
+              <Input
+                type="number"
+                value={form.commissions[p.id] || ""}
+                onChange={(e) => updateCommission(p.id, e.target.value, false)}
+              />
+            </Field>
+            <Field className="flex items-center">
+              <Label className="w-1/3">Upgrade ($)</Label>
+              <Input
+                type="number"
+                value={form.upgradeCommissions[p.id] || ""}
+                onChange={(e) => updateCommission(p.id, e.target.value, true)}
+              />
+            </Field>
+          </div>
+        ))}
+
+        <hr className="my-4" />
+
+        <DateRangeManager
+          plans={plans}
+          dateRanges={dateRanges}
+          setDateRanges={setDateRanges}
+          label="Add Date Ranges for Additional Commission Rules"
+        />
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={addPayscale}>Add</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/AddPersonalPayscaleModal.jsx
+"use client";
+
+import { useState } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+import DateRangeManager from "./DateRangeManager"; // <-- we'll create a shared component
+import { v4 as uuidv4 } from "uuid";
+
+export default function AddPersonalPayscaleModal({ plans, supabase, onClose }) {
+  const [form, setForm] = useState({
+    name: "",
+    upfront_percentage: "",
+    backend_percentage: "",
+    commissions: {},
+    upgradeCommissions: {},
+  });
+
+  // This will hold "dynamic" date ranges for special commissions:
+  // Each range has { id, start_date, end_date, planValues: { planId: { base, upgrade } } }
+  const [dateRanges, setDateRanges] = useState([]);
+
+  function updateCommission(planId, value, isUpgrade = false) {
+    if (isUpgrade) {
+      setForm((prev) => ({
+        ...prev,
+        upgradeCommissions: { ...prev.upgradeCommissions, [planId]: value },
+      }));
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        commissions: { ...prev.commissions, [planId]: value },
+      }));
+    }
+  }
+
+  async function addPayscale() {
+    if (!form.name.trim()) return;
+    const up = parseFloat(form.upfront_percentage) || 0;
+    const bp = parseFloat(form.backend_percentage) || 0;
+
+    // 1) Insert base payscale
+    const { data: inserted, error } = await supabase
+      .from("personal_payscales")
+      .insert([{ name: form.name.trim(), upfront_percentage: up, backend_percentage: bp }])
+      .select("*")
+      .single();
+    if (error || !inserted) return;
+
+    // 2) Insert base plan commissions
+    const commissionsArray = plans.map((p) => ({
+      personal_payscale_id: inserted.id,
+      plan_id: p.id,
+      rep_commission_type: "fixed_amount",
+      rep_commission_value: parseFloat(form.commissions[p.id] || "0"),
+      rep_upgrade_commission_type: "fixed_amount",
+      rep_upgrade_commission_value: parseFloat(form.upgradeCommissions[p.id] || "0"),
+    }));
+    await supabase.from("personal_payscale_plan_commissions").insert(commissionsArray);
+
+    // 3) Handle dateRanges
+    // For each dateRange, we insert a row in personal_payscale_date_ranges
+    // then insert child plan commissions in personal_payscale_date_range_plan_commissions
+    for (const dr of dateRanges) {
+      const { data: insertedRange } = await supabase
+        .from("personal_payscale_date_ranges")
+        .insert([
+          {
+            personal_payscale_id: inserted.id,
+            start_date: dr.start_date,
+            end_date: dr.end_date || null,
+          },
+        ])
+        .select("*")
+        .single();
+      if (!insertedRange) continue;
+
+      // now insert the plan commissions for this date range
+      const planCommArr = [];
+      for (const p of plans) {
+        const valObj = dr.planValues[p.id] || { base: "0", upgrade: "0" };
+        planCommArr.push({
+          personal_payscale_date_range_id: insertedRange.id,
+          plan_id: p.id,
+          rep_commission_type: "fixed_amount",
+          rep_commission_value: parseFloat(valObj.base || "0"),
+          rep_upgrade_commission_type: "fixed_amount",
+          rep_upgrade_commission_value: parseFloat(valObj.upgrade || "0"),
+        });
+      }
+      await supabase
+        .from("personal_payscale_date_range_plan_commissions")
+        .insert(planCommArr);
+    }
+
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Add Personal Payscale</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Payscale Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </Field>
+
+        <div className="flex space-x-4 mb-4">
+          <Field className="w-1/2">
+            <Label>Upfront (%)</Label>
+            <Input
+              type="number"
+              value={form.upfront_percentage}
+              onChange={(e) => setForm({ ...form, upfront_percentage: e.target.value })}
+            />
+          </Field>
+          <Field className="w-1/2">
+            <Label>Backend (%)</Label>
+            <Input
+              type="number"
+              value={form.backend_percentage}
+              onChange={(e) => setForm({ ...form, backend_percentage: e.target.value })}
+            />
+          </Field>
+        </div>
+
+        <h3 className="font-semibold mb-2">Base Commissions (per plan)</h3>
+        {plans.map((p) => (
+          <div key={p.id} className="border p-2 mb-2 rounded">
+            <div className="font-medium mb-1">{p.name}</div>
+            <Field className="flex items-center mb-2">
+              <Label className="w-1/3">Base ($)</Label>
+              <Input
+                type="number"
+                value={form.commissions[p.id] || ""}
+                onChange={(e) => updateCommission(p.id, e.target.value, false)}
+              />
+            </Field>
+            <Field className="flex items-center">
+              <Label className="w-1/3">Upgrade ($)</Label>
+              <Input
+                type="number"
+                value={form.upgradeCommissions[p.id] || ""}
+                onChange={(e) => updateCommission(p.id, e.target.value, true)}
+              />
+            </Field>
+          </div>
+        ))}
+
+        <hr className="my-4" />
+
+        <DateRangeManager
+          plans={plans}
+          dateRanges={dateRanges}
+          setDateRanges={setDateRanges}
+          label="Add Date Ranges for Additional Commission Rules"
+        />
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={addPayscale}>Add</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/AddPlanModal.jsx
+"use client";
+
+import { useState } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+
+export default function AddPlanModal({ supabase, onClose }) {
+  const [planName, setPlanName] = useState("");
+
+  async function addPlan() {
+    if (!planName.trim()) return;
+    await supabase.from("plans").insert([{ name: planName.trim(), commission_amount: 0 }]);
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="md">
+      <DialogTitle>Add Plan</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Plan Name</Label>
+          <Input value={planName} onChange={(e) => setPlanName(e.target.value)} />
+        </Field>
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={addPlan}>Add</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/DateRangeManager.jsx
+"use client";
+
+import { useState } from "react";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+
+/**
+ * A shared component for normal (non-Fidium) date ranges that can handle base + upgrade logic.
+ *
+ * Props:
+ *   - plans: array of { id, name }
+ *   - dateRanges: array of date range objects
+ *   - setDateRanges: function to update
+ *   - label: string
+ */
+export default function DateRangeManager({
+  plans = [],
+  dateRanges = [],
+  setDateRanges,
+  label,
+}) {
+  // Ensure arrays
+  const safeRanges = Array.isArray(dateRanges) ? dateRanges : [];
+  const safePlans = Array.isArray(plans) ? plans : [];
+
+  function addNewRange() {
+    setDateRanges((prev) => {
+      const old = Array.isArray(prev) ? prev : [];
+      // For each plan, default base/upgrade=0
+      const planObj = {};
+      for (const p of safePlans) {
+        planObj[p.id] = { base: "0", upgrade: "0" };
+      }
+      const newRange = {
+        id: "local-" + Math.random().toString(36).substring(2),
+        start_date: "",
+        end_date: "",
+        planValues: planObj,
+      };
+      return [...old, newRange];
+    });
+  }
+
+  function removeRange(id) {
+    setDateRanges((prev) => {
+      const old = Array.isArray(prev) ? prev : [];
+      return old.filter((dr) => dr.id !== id);
+    });
+  }
+
+  function updateRange(id, field, value) {
+    setDateRanges((prev) => {
+      const old = Array.isArray(prev) ? prev : [];
+      return old.map((dr) => (dr.id === id ? { ...dr, [field]: value } : dr));
+    });
+  }
+
+  function updatePlanValue(rangeId, planId, key, value) {
+    setDateRanges((prev) => {
+      const old = Array.isArray(prev) ? prev : [];
+      return old.map((dr) => {
+        if (dr.id !== rangeId) return dr;
+        const oldPlanValues = dr.planValues || {};
+        const planObj = oldPlanValues[planId] || { base: "0", upgrade: "0" };
+        return {
+          ...dr,
+          planValues: {
+            ...oldPlanValues,
+            [planId]: {
+              ...planObj,
+              [key]: value,
+            },
+          },
+        };
+      });
+    });
+  }
+
+  return (
+    <div className="border p-2 rounded bg-gray-50">
+      <h4 className="font-semibold mb-2">{label}</h4>
+      <Button variant="outline" onClick={addNewRange}>
+        + Add Date Range
+      </Button>
+
+      {safeRanges.length === 0 && (
+        <div className="text-xs text-gray-400 mt-1">(No date ranges)</div>
+      )}
+
+      {safeRanges.map((dr) => (
+        <div key={dr.id} className="p-2 border rounded mt-2 bg-white">
+          <div className="flex items-center gap-4 mb-2">
+            <Field className="w-1/3">
+              <Label className="text-sm">Start Date</Label>
+              <Input
+                type="date"
+                value={dr.start_date || ""}
+                onChange={(e) => updateRange(dr.id, "start_date", e.target.value)}
+              />
+            </Field>
+            <Field className="w-1/3">
+              <Label className="text-sm">End Date</Label>
+              <Input
+                type="date"
+                value={dr.end_date || ""}
+                onChange={(e) => updateRange(dr.id, "end_date", e.target.value)}
+              />
+            </Field>
+            <Button size="sm" variant="outline" onClick={() => removeRange(dr.id)}>
+              Remove
+            </Button>
+          </div>
+
+          {/* Per-plan fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {safePlans.map((p) => {
+              const valObj = dr.planValues?.[p.id] || { base: "0", upgrade: "0" };
+              return (
+                <div key={p.id} className="border p-2 rounded text-sm">
+                  <div className="font-medium mb-1">{p.name}</div>
+                  <Field className="flex items-center mb-1">
+                    <Label className="w-1/3 text-xs">Base($)</Label>
+                    <Input
+                      type="number"
+                      value={valObj.base}
+                      onChange={(e) =>
+                        updatePlanValue(dr.id, p.id, "base", e.target.value)
+                      }
+                    />
+                  </Field>
+                  <Field className="flex items-center">
+                    <Label className="w-1/3 text-xs">Upgr($)</Label>
+                    <Input
+                      type="number"
+                      value={valObj.upgrade}
+                      onChange={(e) =>
+                        updatePlanValue(dr.id, p.id, "upgrade", e.target.value)
+                      }
+                    />
+                  </Field>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/DateRangeManagerFidium.jsx
+"use client";
+
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+
+/**
+ * For Fidium, typically no "upgrade," just "base." 
+ * We'll still store them in planValues as { base, upgrade }, but upgrade can be ignored.
+ *
+ * Props:
+ *   - fidiumPlans: array of { id, name }
+ *   - dateRanges: array
+ *   - setDateRanges: function
+ *   - label: string
+ */
+export default function DateRangeManagerFidium({
+  fidiumPlans = [],
+  dateRanges = [],
+  setDateRanges,
+  label,
+}) {
+  const safeRanges = Array.isArray(dateRanges) ? dateRanges : [];
+  const safePlans = Array.isArray(fidiumPlans) ? fidiumPlans : [];
+
+  function addNewRange() {
+    setDateRanges((prev) => {
+      const old = Array.isArray(prev) ? prev : [];
+      const planObj = {};
+      for (const fp of safePlans) {
+        planObj[fp.id] = { base: "0" };
+      }
+      const newRange = {
+        id: "local-" + Math.random().toString(36).substring(2),
+        start_date: "",
+        end_date: "",
+        planValues: planObj,
+      };
+      return [...old, newRange];
+    });
+  }
+
+  function removeRange(id) {
+    setDateRanges((prev) => {
+      const old = Array.isArray(prev) ? prev : [];
+      return old.filter((dr) => dr.id !== id);
+    });
+  }
+
+  function updateRange(id, field, value) {
+    setDateRanges((prev) => {
+      const old = Array.isArray(prev) ? prev : [];
+      return old.map((dr) => {
+        if (dr.id !== id) return dr;
+        return { ...dr, [field]: value };
+      });
+    });
+  }
+
+  function updatePlanValue(rangeId, planId, newVal) {
+    setDateRanges((prev) => {
+      const old = Array.isArray(prev) ? prev : [];
+      return old.map((dr) => {
+        if (dr.id !== rangeId) return dr;
+        const oldVals = dr.planValues || {};
+        const planObj = oldVals[planId] || { base: "0" };
+        return {
+          ...dr,
+          planValues: {
+            ...oldVals,
+            [planId]: {
+              ...planObj,
+              base: newVal,
+            },
+          },
+        };
+      });
+    });
+  }
+
+  return (
+    <div className="border p-2 rounded bg-gray-50">
+      <h4 className="font-semibold mb-2">{label}</h4>
+      <Button variant="outline" onClick={addNewRange}>
+        + Add Date Range
+      </Button>
+
+      {safeRanges.length === 0 && (
+        <div className="text-xs text-gray-400 mt-1">(No date ranges)</div>
+      )}
+
+      {safeRanges.map((dr) => (
+        <div key={dr.id} className="p-2 border rounded mt-2 bg-white">
+          <div className="flex items-center gap-4 mb-2">
+            <Field className="w-1/3">
+              <Label className="text-sm">Start Date</Label>
+              <Input
+                type="date"
+                value={dr.start_date || ""}
+                onChange={(e) => updateRange(dr.id, "start_date", e.target.value)}
+              />
+            </Field>
+            <Field className="w-1/3">
+              <Label className="text-sm">End Date</Label>
+              <Input
+                type="date"
+                value={dr.end_date || ""}
+                onChange={(e) => updateRange(dr.id, "end_date", e.target.value)}
+              />
+            </Field>
+            <Button size="sm" variant="outline" onClick={() => removeRange(dr.id)}>
+              Remove
+            </Button>
+          </div>
+
+          {/* Per-plan fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {safePlans.map((fp) => {
+              const valObj = dr.planValues?.[fp.id] || { base: "0" };
+              return (
+                <div key={fp.id} className="border p-2 rounded text-sm">
+                  <div className="font-medium mb-1">{fp.name}</div>
+                  <Field className="flex items-center">
+                    <Label className="w-1/3 text-xs">Base($)</Label>
+                    <Input
+                      type="number"
+                      value={valObj.base}
+                      onChange={(e) =>
+                        updatePlanValue(dr.id, fp.id, e.target.value)
+                      }
+                    />
+                  </Field>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/EditAgentModal.jsx
+"use client";
+
+import { useState } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Select } from "@/components/select";
+import { Checkbox, CheckboxField } from "@/components/checkbox";
+import { Button } from "@/components/button";
+import { BadgeButton } from "@/components/badge";
+
+export default function EditAgentModal({
+  agent,
+  allAgents,
+  agentManagers,
+  personalPayscales,
+  managerPayscales,
+  fidiumPersonalPayscales,
+  fidiumManagerPayscales,
+  fidiumSalesmen,
+  supabase,
+  onClose,
+}) {
+  const assignedIds = agentManagers
+    .filter((am) => am.manager_id === agent.id)
+    .map((am) => am.agent_id);
+
+  const [form, setForm] = useState({
+    id: agent.id,
+    name: agent.name,
+    identifier: agent.identifier,
+    fidium_identifier: agent.fidium_identifier || "",
+    is_manager: agent.is_manager,
+    personal_payscale_id: agent.personal_payscale_id || "",
+    manager_payscale_id: agent.manager_payscale_id || "",
+    fidium_personal_payscale_id: agent.fidium_personal_payscale_id || "",
+    fidium_manager_payscale_id: agent.fidium_manager_payscale_id || "",
+    assignedAgents: assignedIds,
+  });
+
+  const [searchVal, setSearchVal] = useState("");
+
+  // Agents that can be assigned to this manager
+  const assignable = allAgents.filter(
+    (a) => a.id !== agent.id && !form.assignedAgents.includes(a.id)
+  );
+  const filteredAssignable = searchVal
+    ? assignable.filter((a) =>
+        (a.name || a.identifier || "")
+          .toLowerCase()
+          .includes(searchVal.toLowerCase())
+      )
+    : assignable;
+
+  const [fidiumSearch, setFidiumSearch] = useState("");
+
+  async function updateAgent() {
+    await supabase
+      .from("agents")
+      .update({
+        name: form.name.trim(),
+        identifier: form.identifier.trim(),
+        fidium_identifier: form.fidium_identifier.trim() || null,
+        is_manager: form.is_manager,
+        personal_payscale_id: form.personal_payscale_id || null,
+        manager_payscale_id: form.is_manager ? form.manager_payscale_id || null : null,
+        fidium_personal_payscale_id: form.fidium_personal_payscale_id || null,
+        fidium_manager_payscale_id: form.is_manager
+          ? form.fidium_manager_payscale_id || null
+          : null,
+      })
+      .eq("id", form.id);
+
+    // Reassign agent_managers
+    await supabase.from("agent_managers").delete().eq("manager_id", form.id);
+    if (form.is_manager && form.assignedAgents.length > 0) {
+      const arr = form.assignedAgents.map((aid) => ({
+        agent_id: aid,
+        manager_id: form.id,
+      }));
+      await supabase.from("agent_managers").insert(arr);
+    }
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Edit Agent</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </Field>
+
+        <Field className="mb-4">
+          <Label>Identifier</Label>
+          <Input
+            value={form.identifier}
+            onChange={(e) => setForm({ ...form, identifier: e.target.value })}
+          />
+        </Field>
+
+        <Field className="mb-4">
+          <Label>Fidium Identifier</Label>
+          <Input
+            value={form.fidium_identifier}
+            onChange={(e) => {
+              setForm({ ...form, fidium_identifier: e.target.value });
+              setFidiumSearch(e.target.value);
+            }}
+          />
+          {/** Searching Fidium Salesmen */}
+          {fidiumSearch && (
+            <div className="mt-2 border p-2 rounded max-h-48 overflow-auto bg-white">
+              {fidiumSalesmen
+                .filter((fs) =>
+                  fs.rep_name.toLowerCase().includes(fidiumSearch.toLowerCase())
+                )
+                .map((fs) => (
+                  <div
+                    key={fs.id}
+                    className="cursor-pointer hover:bg-gray-100 p-1"
+                    onClick={() => {
+                      setForm({ ...form, fidium_identifier: fs.rep_name });
+                      setFidiumSearch("");
+                    }}
+                  >
+                    {fs.rep_name}
+                  </div>
+                ))}
+            </div>
+          )}
+        </Field>
+
+        <CheckboxField className="mb-4">
+          <Checkbox
+            checked={form.is_manager}
+            onChange={(val) => setForm({ ...form, is_manager: val })}
+          />
+          <Label>Is Manager?</Label>
+        </CheckboxField>
+
+        <Field className="mb-4">
+          <Label>Personal Payscale</Label>
+          <Select
+            value={form.personal_payscale_id}
+            onChange={(e) =>
+              setForm({ ...form, personal_payscale_id: e.target.value })
+            }
+          >
+            <option value="">(None)</option>
+            {personal_payscale_id =>
+              personalPayscales.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))
+            }
+          </Select>
+        </Field>
+
+        {form.is_manager && (
+          <Field className="mb-4">
+            <Label>Manager Payscale</Label>
+            <Select
+              value={form.manager_payscale_id}
+              onChange={(e) => setForm({ ...form, manager_payscale_id: e.target.value })}
+            >
+              <option value="">(None)</option>
+              {managerPayscales.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+
+        <Field className="mb-4">
+          <Label>Fidium Personal Payscale</Label>
+          <Select
+            value={form.fidium_personal_payscale_id}
+            onChange={(e) =>
+              setForm({ ...form, fidium_personal_payscale_id: e.target.value })
+            }
+          >
+            <option value="">(None)</option>
+            {fidiumPersonalPayscales.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        {form.is_manager && (
+          <Field className="mb-4">
+            <Label>Fidium Manager Payscale</Label>
+            <Select
+              value={form.fidium_manager_payscale_id}
+              onChange={(e) =>
+                setForm({ ...form, fidium_manager_payscale_id: e.target.value })
+              }
+            >
+              <option value="">(None)</option>
+              {fidiumManagerPayscales.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+
+        {/* If manager, show assigned agents */}
+        {form.is_manager && (
+          <Field className="mb-4">
+            <Label>Assigned Agents</Label>
+            <Input
+              placeholder="Search other agents..."
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
+            />
+            <div className="my-2 flex flex-wrap gap-2">
+              {form.assignedAgents.map((aid) => {
+                const A = allAgents.find((x) => x.id === aid);
+                if (!A) return null;
+                return (
+                  <BadgeButton
+                    key={aid}
+                    color="blue"
+                    onClick={() =>
+                      setForm({
+                        ...form,
+                        assignedAgents: form.assignedAgents.filter((x) => x !== aid),
+                      })
+                    }
+                  >
+                    {A.name || A.identifier} ×
+                  </BadgeButton>
+                );
+              })}
+            </div>
+            <div className="border p-2 mt-2 max-h-48 overflow-auto rounded">
+              {filteredAssignable.map((a) => (
+                <div
+                  key={a.id}
+                  className="cursor-pointer hover:bg-gray-100 p-1"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      assignedAgents: [...form.assignedAgents, a.id],
+                    })
+                  }
+                >
+                  {a.name || a.identifier}
+                </div>
+              ))}
+            </div>
+          </Field>
+        )}
+      </DialogBody>
+
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={updateAgent}>Save</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/EditFidiumManagerModal.jsx
+"use client";
+
+import { useState, useEffect } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+import DateRangeManagerFidium from "./DateRangeManagerFidium";
+
+export default function EditFidiumManagerModal({
+  payscale,
+  fidiumPlans,
+  supabase,
+  onClose,
+}) {
+  const commObj = {};
+  (payscale.manager_payscale_plan_commissions || []).forEach((c) => {
+    commObj[c.fidium_plan_id] = c.manager_commission_value;
+  });
+
+  const [form, setForm] = useState({
+    name: payscale.name,
+    commissions: { ...commObj },
+  });
+
+  const [dateRanges, setDateRanges] = useState([]);
+
+  async function loadExistingDateRanges() {
+    const { data } = await supabase
+      .from("fidium_manager_payscale_date_ranges")
+      .select("*, fidium_manager_payscale_date_range_plan_commissions(*)")
+      .eq("fidium_manager_payscale_id", payscale.id);
+    if (!data) return;
+    const converted = data.map((dr) => {
+      const planValues = {};
+      for (const pc of dr.fidium_manager_payscale_date_range_plan_commissions) {
+        planValues[pc.fidium_plan_id] = {
+          base: pc.manager_commission_value.toString(),
+        };
+      }
+      return {
+        id: dr.id,
+        start_date: dr.start_date,
+        end_date: dr.end_date,
+        planValues,
+      };
+    });
+    setDateRanges(converted);
+  }
+
+  useEffect(() => {
+    loadExistingDateRanges();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function updateCommission(planId, value) {
+    setForm((prev) => ({
+      ...prev,
+      commissions: { ...prev.commissions, [planId]: value },
+    }));
+  }
+
+  async function saveChanges() {
+    // 1) update name
+    await supabase
+      .from("fidium_manager_payscales")
+      .update({ name: form.name.trim() })
+      .eq("id", payscale.id);
+
+    // 2) remove old base commissions
+    await supabase
+      .from("fidium_manager_payscale_plan_commissions")
+      .delete()
+      .eq("fidium_manager_payscale_id", payscale.id);
+
+    // 3) insert new base commissions
+    const arr = fidiumPlans.map((fp) => ({
+      fidium_manager_payscale_id: payscale.id,
+      fidium_plan_id: fp.id,
+      manager_commission_type: "fixed_amount",
+      manager_commission_value: parseFloat(form.commissions[fp.id] || "0"),
+    }));
+    await supabase.from("fidium_manager_payscale_plan_commissions").insert(arr);
+
+    // 4) remove old date ranges
+    await supabase
+      .from("fidium_manager_payscale_date_ranges")
+      .delete()
+      .eq("fidium_manager_payscale_id", payscale.id);
+
+    // 5) insert new date ranges
+    for (const dr of dateRanges) {
+      const { data: insertedRange } = await supabase
+        .from("fidium_manager_payscale_date_ranges")
+        .insert([
+          {
+            fidium_manager_payscale_id: payscale.id,
+            start_date: dr.start_date,
+            end_date: dr.end_date || null,
+          },
+        ])
+        .select("*")
+        .single();
+      if (!insertedRange) continue;
+
+      const planCommArr = [];
+      for (const fp of fidiumPlans) {
+        const baseVal = dr.planValues[fp.id]?.base || "0";
+        planCommArr.push({
+          fidium_manager_payscale_date_range_id: insertedRange.id,
+          fidium_plan_id: fp.id,
+          manager_commission_type: "fixed_amount",
+          manager_commission_value: parseFloat(baseVal),
+        });
+      }
+      await supabase
+        .from("fidium_manager_payscale_date_range_plan_commissions")
+        .insert(planCommArr);
+    }
+
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Edit Fidium Manager Payscale</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Payscale Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </Field>
+        <h3 className="font-semibold mb-2">Base Commissions (Fidium plans)</h3>
+        {fidiumPlans.map((fp) => (
+          <Field key={fp.id} className="mb-2 flex items-center">
+            <Label className="w-1/2">{fp.name}</Label>
+            <div className="w-1/2 flex items-center">
+              <span className="mr-2">$</span>
+              <Input
+                type="number"
+                value={form.commissions[fp.id] || ""}
+                onChange={(e) => updateCommission(fp.id, e.target.value)}
+              />
+            </div>
+          </Field>
+        ))}
+
+        <hr className="my-4" />
+
+        <DateRangeManagerFidium
+          fidiumPlans={fidiumPlans}
+          dateRanges={dateRanges}
+          setDateRanges={setDateRanges}
+          label="Date Ranges"
+        />
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={saveChanges}>Save</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/EditFidiumPersonalModal.jsx
+"use client";
+
+import { useState, useEffect } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+import DateRangeManagerFidium from "./DateRangeManagerFidium";
+
+export default function EditFidiumPersonalModal({
+  payscale,
+  fidiumPlans,
+  supabase,
+  onClose,
+}) {
+  const commObj = {};
+  (payscale.personal_payscale_plan_commissions || []).forEach((c) => {
+    commObj[c.fidium_plan_id] = c.rep_commission_value;
+  });
+
+  const [form, setForm] = useState({
+    name: payscale.name,
+    upfront_percentage: payscale.upfront_percentage.toString(),
+    backend_percentage: payscale.backend_percentage.toString(),
+    commissions: { ...commObj },
+  });
+
+  const [dateRanges, setDateRanges] = useState([]);
+
+  async function loadExistingDateRanges() {
+    const { data } = await supabase
+      .from("fidium_personal_payscale_date_ranges")
+      .select("*, fidium_personal_payscale_date_range_plan_commissions(*)")
+      .eq("fidium_personal_payscale_id", payscale.id);
+    if (!data) return;
+    const converted = data.map((dr) => {
+      const planValues = {};
+      for (const pc of dr.fidium_personal_payscale_date_range_plan_commissions) {
+        planValues[pc.fidium_plan_id] = {
+          base: pc.rep_commission_value.toString(),
+        };
+      }
+      return {
+        id: dr.id,
+        start_date: dr.start_date,
+        end_date: dr.end_date,
+        planValues,
+      };
+    });
+    setDateRanges(converted);
+  }
+
+  useEffect(() => {
+    loadExistingDateRanges();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function updateCommission(planId, value) {
+    setForm((prev) => ({
+      ...prev,
+      commissions: { ...prev.commissions, [planId]: value },
+    }));
+  }
+
+  async function saveChanges() {
+    const up = parseFloat(form.upfront_percentage) || 0;
+    const bp = parseFloat(form.backend_percentage) || 0;
+
+    // 1) Update payscale
+    await supabase
+      .from("fidium_personal_payscales")
+      .update({
+        name: form.name.trim(),
+        upfront_percentage: up,
+        backend_percentage: bp,
+      })
+      .eq("id", payscale.id);
+
+    // 2) Remove old base commissions
+    await supabase
+      .from("fidium_personal_payscale_plan_commissions")
+      .delete()
+      .eq("fidium_personal_payscale_id", payscale.id);
+
+    // 3) Insert new base commissions
+    const arr = fidiumPlans.map((fp) => ({
+      fidium_personal_payscale_id: payscale.id,
+      fidium_plan_id: fp.id,
+      rep_commission_type: "fixed_amount",
+      rep_commission_value: parseFloat(form.commissions[fp.id] || "0"),
+    }));
+    await supabase.from("fidium_personal_payscale_plan_commissions").insert(arr);
+
+    // 4) Remove old date ranges
+    await supabase
+      .from("fidium_personal_payscale_date_ranges")
+      .delete()
+      .eq("fidium_personal_payscale_id", payscale.id);
+
+    // 5) Insert new date ranges
+    for (const dr of dateRanges) {
+      const { data: insertedRange } = await supabase
+        .from("fidium_personal_payscale_date_ranges")
+        .insert([
+          {
+            fidium_personal_payscale_id: payscale.id,
+            start_date: dr.start_date,
+            end_date: dr.end_date || null,
+          },
+        ])
+        .select("*")
+        .single();
+      if (!insertedRange) continue;
+
+      const planCommArr = [];
+      for (const fp of fidiumPlans) {
+        const baseVal = dr.planValues[fp.id]?.base || "0";
+        planCommArr.push({
+          fidium_personal_payscale_date_range_id: insertedRange.id,
+          fidium_plan_id: fp.id,
+          rep_commission_type: "fixed_amount",
+          rep_commission_value: parseFloat(baseVal),
+        });
+      }
+      await supabase
+        .from("fidium_personal_payscale_date_range_plan_commissions")
+        .insert(planCommArr);
+    }
+
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Edit Fidium Personal Payscale</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Payscale Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </Field>
+
+        <div className="flex space-x-4 mb-4">
+          <Field className="w-1/2">
+            <Label>Upfront (%)</Label>
+            <Input
+              type="number"
+              value={form.upfront_percentage}
+              onChange={(e) =>
+                setForm({ ...form, upfront_percentage: e.target.value })
+              }
+            />
+          </Field>
+          <Field className="w-1/2">
+            <Label>Backend (%)</Label>
+            <Input
+              type="number"
+              value={form.backend_percentage}
+              onChange={(e) =>
+                setForm({ ...form, backend_percentage: e.target.value })
+              }
+            />
+          </Field>
+        </div>
+
+        <h3 className="font-semibold mb-2">Base Commissions (per Fidium plan)</h3>
+        {fidiumPlans.map((fp) => (
+          <Field key={fp.id} className="mb-2 flex items-center">
+            <Label className="w-1/2">{fp.name}</Label>
+            <div className="w-1/2 flex items-center">
+              <span className="mr-2">$</span>
+              <Input
+                type="number"
+                value={form.commissions[fp.id] || ""}
+                onChange={(e) => updateCommission(fp.id, e.target.value)}
+              />
+            </div>
+          </Field>
+        ))}
+
+        <hr className="my-4" />
+
+        <DateRangeManagerFidium
+          fidiumPlans={fidiumPlans}
+          dateRanges={dateRanges}
+          setDateRanges={setDateRanges}
+          label="Date Ranges"
+        />
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={saveChanges}>Save</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/EditManagerPayscaleModal.jsx
+"use client";
+
+import { useState, useEffect } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+import DateRangeManager from "./DateRangeManager";
+
+export default function EditManagerPayscaleModal({ payscale, plans, supabase, onClose }) {
+  const commObj = {};
+  const upgObj = {};
+  (payscale.manager_payscale_plan_commissions || []).forEach((c) => {
+    commObj[c.plan_id] = c.manager_commission_value;
+    upgObj[c.plan_id] = c.manager_upgrade_commission_value;
+  });
+
+  const [form, setForm] = useState({
+    name: payscale.name,
+    commissions: { ...commObj },
+    upgradeCommissions: { ...upgObj },
+  });
+
+  const [dateRanges, setDateRanges] = useState([]);
+
+  async function loadExistingDateRanges() {
+    const { data } = await supabase
+      .from("manager_payscale_date_ranges")
+      .select("*, manager_payscale_date_range_plan_commissions(*)")
+      .eq("manager_payscale_id", payscale.id);
+    if (!data) return;
+    const converted = data.map((dr) => {
+      const planValues = {};
+      for (const pc of dr.manager_payscale_date_range_plan_commissions) {
+        planValues[pc.plan_id] = {
+          base: pc.manager_commission_value.toString(),
+          upgrade: pc.manager_upgrade_commission_value.toString(),
+        };
+      }
+      return {
+        id: dr.id,
+        start_date: dr.start_date,
+        end_date: dr.end_date,
+        planValues,
+      };
+    });
+    setDateRanges(converted);
+  }
+
+  useEffect(() => {
+    loadExistingDateRanges();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function updateCommission(planId, value, isUpgrade = false) {
+    if (isUpgrade) {
+      setForm((prev) => ({
+        ...prev,
+        upgradeCommissions: { ...prev.upgradeCommissions, [planId]: value },
+      }));
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        commissions: { ...prev.commissions, [planId]: value },
+      }));
+    }
+  }
+
+  async function saveChanges() {
+    // 1) Update payscale name
+    await supabase
+      .from("manager_payscales")
+      .update({ name: form.name.trim() })
+      .eq("id", payscale.id);
+
+    // 2) Remove old base commissions
+    await supabase
+      .from("manager_payscale_plan_commissions")
+      .delete()
+      .eq("manager_payscale_id", payscale.id);
+
+    // 3) Insert new base commissions
+    const arr = plans.map((p) => ({
+      manager_payscale_id: payscale.id,
+      plan_id: p.id,
+      manager_commission_type: "fixed_amount",
+      manager_commission_value: parseFloat(form.commissions[p.id] || "0"),
+      manager_upgrade_commission_type: "fixed_amount",
+      manager_upgrade_commission_value: parseFloat(
+        form.upgradeCommissions[p.id] || "0"
+      ),
+    }));
+    await supabase.from("manager_payscale_plan_commissions").insert(arr);
+
+    // 4) Remove old date ranges
+    await supabase
+      .from("manager_payscale_date_ranges")
+      .delete()
+      .eq("manager_payscale_id", payscale.id);
+
+    // 5) Re-insert date ranges
+    for (const dr of dateRanges) {
+      const { data: insertedRange } = await supabase
+        .from("manager_payscale_date_ranges")
+        .insert([
+          {
+            manager_payscale_id: payscale.id,
+            start_date: dr.start_date,
+            end_date: dr.end_date || null,
+          },
+        ])
+        .select("*")
+        .single();
+      if (!insertedRange) continue;
+
+      const planCommArr = [];
+      for (const p of plans) {
+        const valObj = dr.planValues[p.id] || { base: "0", upgrade: "0" };
+        planCommArr.push({
+          manager_payscale_date_range_id: insertedRange.id,
+          plan_id: p.id,
+          manager_commission_type: "fixed_amount",
+          manager_commission_value: parseFloat(valObj.base || "0"),
+          manager_upgrade_commission_type: "fixed_amount",
+          manager_upgrade_commission_value: parseFloat(valObj.upgrade || "0"),
+        });
+      }
+      await supabase
+        .from("manager_payscale_date_range_plan_commissions")
+        .insert(planCommArr);
+    }
+
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Edit Manager Payscale</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Payscale Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </Field>
+
+        <h3 className="font-semibold mb-2">Base Commissions (per plan)</h3>
+        {plans.map((p) => (
+          <div key={p.id} className="border p-2 mb-2 rounded">
+            <div className="font-medium mb-1">{p.name}</div>
+            <Field className="flex items-center mb-2">
+              <Label className="w-1/3">Base ($)</Label>
+              <Input
+                type="number"
+                value={form.commissions[p.id] || ""}
+                onChange={(e) => updateCommission(p.id, e.target.value, false)}
+              />
+            </Field>
+            <Field className="flex items-center">
+              <Label className="w-1/3">Upgrade ($)</Label>
+              <Input
+                type="number"
+                value={form.upgradeCommissions[p.id] || ""}
+                onChange={(e) => updateCommission(p.id, e.target.value, true)}
+              />
+            </Field>
+          </div>
+        ))}
+
+        <hr className="my-4" />
+
+        <DateRangeManager
+          plans={plans}
+          dateRanges={dateRanges}
+          setDateRanges={setDateRanges}
+          label="Date Ranges"
+        />
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={saveChanges}>Save</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/EditPersonalPayscaleModal.jsx
+"use client";
+
+import { useState, useEffect } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+import DateRangeManager from "./DateRangeManager";
+
+export default function EditPersonalPayscaleModal({ payscale, plans, supabase, onClose }) {
+  // Flatten existing base commissions
+  const commissionsObj = {};
+  const upgradeObj = {};
+  (payscale.personal_payscale_plan_commissions || []).forEach((c) => {
+    commissionsObj[c.plan_id] = c.rep_commission_value;
+    upgradeObj[c.plan_id] = c.rep_upgrade_commission_value;
+  });
+
+  const [form, setForm] = useState({
+    name: payscale.name,
+    upfront_percentage: payscale.upfront_percentage?.toString() || "0",
+    backend_percentage: payscale.backend_percentage?.toString() || "0",
+    commissions: { ...commissionsObj },
+    upgradeCommissions: { ...upgradeObj },
+  });
+
+  // Load existing date ranges
+  const [dateRanges, setDateRanges] = useState([]);
+
+  async function loadExistingDateRanges() {
+    const { data } = await supabase
+      .from("personal_payscale_date_ranges")
+      .select("*, personal_payscale_date_range_plan_commissions(*)")
+      .eq("personal_payscale_id", payscale.id);
+    if (!data) return;
+    // Convert to the shape used by <DateRangeManager />
+    const converted = data.map((dr) => {
+      const planValues = {};
+      for (const pc of dr.personal_payscale_date_range_plan_commissions) {
+        planValues[pc.plan_id] = {
+          base: pc.rep_commission_value.toString(),
+          upgrade: pc.rep_upgrade_commission_value.toString(),
+        };
+      }
+      return {
+        id: dr.id,
+        start_date: dr.start_date,
+        end_date: dr.end_date,
+        planValues,
+      };
+    });
+    setDateRanges(converted);
+  }
+
+  useEffect(() => {
+    loadExistingDateRanges();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function updateCommission(planId, value, isUpgrade = false) {
+    if (isUpgrade) {
+      setForm((prev) => ({
+        ...prev,
+        upgradeCommissions: { ...prev.upgradeCommissions, [planId]: value },
+      }));
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        commissions: { ...prev.commissions, [planId]: value },
+      }));
+    }
+  }
+
+  async function saveChanges() {
+    const up = parseFloat(form.upfront_percentage) || 0;
+    const bp = parseFloat(form.backend_percentage) || 0;
+
+    // 1) Update base payscale
+    await supabase
+      .from("personal_payscales")
+      .update({
+        name: form.name.trim(),
+        upfront_percentage: up,
+        backend_percentage: bp,
+      })
+      .eq("id", payscale.id);
+
+    // 2) Remove old base commissions
+    await supabase
+      .from("personal_payscale_plan_commissions")
+      .delete()
+      .eq("personal_payscale_id", payscale.id);
+
+    // 3) Insert new base commissions
+    const arr = plans.map((p) => ({
+      personal_payscale_id: payscale.id,
+      plan_id: p.id,
+      rep_commission_type: "fixed_amount",
+      rep_commission_value: parseFloat(form.commissions[p.id] || "0"),
+      rep_upgrade_commission_type: "fixed_amount",
+      rep_upgrade_commission_value: parseFloat(form.upgradeCommissions[p.id] || "0"),
+    }));
+    await supabase.from("personal_payscale_plan_commissions").insert(arr);
+
+    // 4) Remove old date ranges entirely
+    await supabase
+      .from("personal_payscale_date_ranges")
+      .delete()
+      .eq("personal_payscale_id", payscale.id);
+
+    // 5) Re-insert each date range and its plan commissions
+    for (const dr of dateRanges) {
+      const { data: insertedRange } = await supabase
+        .from("personal_payscale_date_ranges")
+        .insert([
+          {
+            personal_payscale_id: payscale.id,
+            start_date: dr.start_date,
+            end_date: dr.end_date || null,
+          },
+        ])
+        .select("*")
+        .single();
+      if (!insertedRange) continue;
+
+      const planCommArr = [];
+      for (const p of plans) {
+        const valObj = dr.planValues[p.id] || { base: "0", upgrade: "0" };
+        planCommArr.push({
+          personal_payscale_date_range_id: insertedRange.id,
+          plan_id: p.id,
+          rep_commission_type: "fixed_amount",
+          rep_commission_value: parseFloat(valObj.base || "0"),
+          rep_upgrade_commission_type: "fixed_amount",
+          rep_upgrade_commission_value: parseFloat(valObj.upgrade || "0"),
+        });
+      }
+      await supabase
+        .from("personal_payscale_date_range_plan_commissions")
+        .insert(planCommArr);
+    }
+
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Edit Personal Payscale</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Payscale Name</Label>
+          <Input
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </Field>
+
+        <div className="flex space-x-4 mb-4">
+          <Field className="w-1/2">
+            <Label>Upfront (%)</Label>
+            <Input
+              type="number"
+              value={form.upfront_percentage}
+              onChange={(e) => setForm({ ...form, upfront_percentage: e.target.value })}
+            />
+          </Field>
+          <Field className="w-1/2">
+            <Label>Backend (%)</Label>
+            <Input
+              type="number"
+              value={form.backend_percentage}
+              onChange={(e) => setForm({ ...form, backend_percentage: e.target.value })}
+            />
+          </Field>
+        </div>
+
+        <h3 className="font-semibold mb-2">Base Commissions (per plan)</h3>
+        {plans.map((p) => (
+          <div key={p.id} className="border p-2 mb-2 rounded">
+            <div className="font-medium mb-1">{p.name}</div>
+            <Field className="flex items-center mb-2">
+              <Label className="w-1/3">Base ($)</Label>
+              <Input
+                type="number"
+                value={form.commissions[p.id] || ""}
+                onChange={(e) => updateCommission(p.id, e.target.value, false)}
+              />
+            </Field>
+            <Field className="flex items-center">
+              <Label className="w-1/3">Upgrade ($)</Label>
+              <Input
+                type="number"
+                value={form.upgradeCommissions[p.id] || ""}
+                onChange={(e) => updateCommission(p.id, e.target.value, true)}
+              />
+            </Field>
+          </div>
+        ))}
+
+        <hr className="my-4" />
+
+        <DateRangeManager
+          plans={plans}
+          dateRanges={dateRanges}
+          setDateRanges={setDateRanges}
+          label="Date Ranges"
+        />
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={saveChanges}>Save</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/FidiumManagerOverridesModal.jsx
+"use client";
+
+import { useState, useEffect } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Select } from "@/components/select";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+import DateRangeManagerFidium from "./DateRangeManagerFidium";
+
+/**
+ * Fidium Manager Overrides using "manager_overrides" table with is_fidium=true.
+ *
+ * Props:
+ *   - payscaleName (string)
+ *   - managerList: array of manager objects
+ *   - assignedAgentsMap: function that returns array of agents for a manager
+ *   - fidiumPlans: array of {id, name}
+ *   - supabase
+ */
+export default function FidiumManagerOverridesModal({
+  payscaleName = "Fidium Payscale",
+  managerList = [],
+  assignedAgentsMap = () => [],
+  fidiumPlans = [],
+  supabase,
+  onClose,
+}) {
+  const initialManagerId = managerList.length > 0 ? managerList[0].id : "";
+  const [managerId, setManagerId] = useState(initialManagerId);
+
+  const [overridesByAgent, setOverridesByAgent] = useState({});
+
+  useEffect(() => {
+    if (managerId) {
+      fetchOverrides(managerId);
+    } else {
+      setOverridesByAgent({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [managerId]);
+
+  async function fetchOverrides(mId) {
+    const { data, error } = await supabase
+      .from("manager_overrides")
+      .select("*")
+      .eq("manager_id", mId)
+      .eq("is_fidium", true);
+
+    if (error) {
+      console.error("Error fetching Fidium overrides:", error);
+      setOverridesByAgent({});
+      return;
+    }
+    const map = {};
+    (data || []).forEach((row) => {
+      map[row.agent_id] = row;
+    });
+    setOverridesByAgent(map);
+  }
+
+  function getAssignedAgents(mId) {
+    const result = assignedAgentsMap(mId);
+    return Array.isArray(result) ? result : [];
+  }
+
+  function getOrCreateOverrideRow(agentId) {
+    const existing = overridesByAgent[agentId];
+    if (!existing) {
+      return {
+        id: null,
+        manager_id: managerId,
+        agent_id: agentId,
+        is_fidium: true,
+        plan_overrides: {},
+        date_ranges: [],
+      };
+    }
+    return existing;
+  }
+
+  function setBaseVal(agentId, planId, newVal) {
+    setOverridesByAgent((prev) => {
+      const oldRow = prev[agentId] || {
+        id: null,
+        manager_id: managerId,
+        agent_id,
+        is_fidium: true,
+        plan_overrides: {},
+        date_ranges: [],
+      };
+      const oldPlan = oldRow.plan_overrides[planId] || { base: "0" };
+      return {
+        ...prev,
+        [agentId]: {
+          ...oldRow,
+          plan_overrides: {
+            ...oldRow.plan_overrides,
+            [planId]: {
+              ...oldPlan,
+              base: newVal,
+            },
+          },
+        },
+      };
+    });
+  }
+
+  function getAgentDateRanges(agentId) {
+    return getOrCreateOverrideRow(agentId).date_ranges || [];
+  }
+
+  function setAgentDateRanges(agentId, newRanges) {
+    setOverridesByAgent((prev) => {
+      const oldRow = getOrCreateOverrideRow(agentId);
+      return {
+        ...prev,
+        [agentId]: {
+          ...oldRow,
+          date_ranges: newRanges,
+        },
+      };
+    });
+  }
+
+  async function handleSave() {
+    // gather all agent rows
+    const assignedAgents = getAssignedAgents(managerId);
+    const allAgentIds = new Set([...assignedAgents.map((a) => a.id), ...Object.keys(overridesByAgent)]);
+
+    const rowsToUpsert = [];
+    for (const agentId of allAgentIds) {
+      const rowObj = getOrCreateOverrideRow(agentId);
+      rowsToUpsert.push({
+        id: rowObj.id || undefined,
+        manager_id: rowObj.manager_id,
+        agent_id: rowObj.agent_id,
+        is_fidium: true,
+        plan_overrides: rowObj.plan_overrides || {},
+        date_ranges: rowObj.date_ranges || [],
+      });
+    }
+
+    for (const item of rowsToUpsert) {
+      const { error } = await supabase.from("manager_overrides").upsert(item).select("*").single();
+      if (error) {
+        console.error("Error upserting Fidium override row:", error);
+      }
+    }
+
+    onClose();
+  }
+
+  if (managerList.length === 0) {
+    return (
+      <Dialog open onClose={onClose} size="md">
+        <DialogTitle>Fidium Manager Overrides ({payscaleName})</DialogTitle>
+        <DialogBody>No Fidium managers found.</DialogBody>
+        <DialogActions>
+          <Button onClick={onClose}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Fidium Manager Overrides ({payscaleName})</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Select Manager</Label>
+          <Select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+            {managerList.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name || m.identifier}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <hr className="my-4" />
+
+        {getAssignedAgents(managerId).length === 0 && (
+          <div>This manager has no assigned agents.</div>
+        )}
+        {getAssignedAgents(managerId).map((agt) => {
+          const row = getOrCreateOverrideRow(agt.id);
+          return (
+            <div key={agt.id} className="mb-6 border-b pb-4">
+              <h3 className="text-lg font-semibold mb-2">
+                Agent: {agt.name || agt.identifier}
+              </h3>
+
+              <p className="text-sm font-medium text-gray-600 mb-2">
+                Base Overrides (per Fidium plan):
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {fidiumPlans.map((fp) => {
+                  const planObj = row.plan_overrides?.[fp.id] || { base: "0" };
+                  return (
+                    <div key={fp.id} className="border p-2 rounded bg-white text-sm">
+                      <div className="font-medium mb-1">{fp.name}</div>
+                      <Field className="flex items-center">
+                        <Label className="w-1/3 text-xs">Base($)</Label>
+                        <Input
+                          type="number"
+                          value={planObj.base}
+                          onChange={(e) =>
+                            setBaseVal(agt.id, fp.id, e.target.value)
+                          }
+                        />
+                      </Field>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-sm font-medium text-gray-600 mt-4 mb-2">
+                Date Range Overrides
+              </p>
+              <DateRangeManagerFidium
+                fidiumPlans={fidiumPlans}
+                dateRanges={row.date_ranges}
+                setDateRanges={(newRanges) => setAgentDateRanges(agt.id, newRanges)}
+                label="Override Commission Amounts by Date"
+              />
+            </div>
+          );
+        })}
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave}>Save All</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/modals/ManagerOverridesModal.jsx
+"use client";
+
+import { useState, useEffect } from "react";
+import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Select } from "@/components/select";
+import { Input } from "@/components/input";
+import { Button } from "@/components/button";
+import DateRangeManager from "./DateRangeManager";
+
+/**
+ * Normal Manager Overrides using the new "manager_overrides" table with is_fidium=false.
+ *
+ * - managerList: array of manager objects => must not be undefined.
+ *   We'll default to an empty array if not provided.
+ * - assignedAgentsMap: function that returns an array of agents for a given managerId. Also default to [] if it returns nothing.
+ * - plans: array of plan objects => default to [] if not provided.
+ * - supabase instance
+ */
+export default function ManagerOverridesModal({
+  payscaleName = "My Payscale",
+  managerList = [],
+  assignedAgentsMap = () => [],
+  plans = [],
+  supabase,
+  onClose,
+}) {
+  // If managerList is empty, set managerId = "" to avoid TypeError
+  const initialManagerId = managerList.length > 0 ? managerList[0].id : "";
+  const [managerId, setManagerId] = useState(initialManagerId);
+
+  // { [agentId]: { id, manager_id, agent_id, plan_overrides, date_ranges } }
+  const [overridesByAgent, setOverridesByAgent] = useState({});
+
+  useEffect(() => {
+    if (managerId) {
+      fetchOverrides(managerId);
+    } else {
+      setOverridesByAgent({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [managerId]);
+
+  async function fetchOverrides(mId) {
+    const { data, error } = await supabase
+      .from("manager_overrides")
+      .select("*")
+      .eq("manager_id", mId)
+      .eq("is_fidium", false);
+
+    if (error) {
+      console.error("Error fetching overrides", error);
+      setOverridesByAgent({});
+      return;
+    }
+    const map = {};
+    (data || []).forEach((row) => {
+      map[row.agent_id] = row;
+    });
+    setOverridesByAgent(map);
+  }
+
+  function getAssignedAgents(mId) {
+    const result = assignedAgentsMap(mId);
+    return Array.isArray(result) ? result : [];
+  }
+
+  function getOrCreateOverrideRow(agentId) {
+    const existing = overridesByAgent[agentId];
+    if (!existing) {
+      return {
+        id: null,
+        manager_id: managerId,
+        agent_id: agentId,
+        is_fidium: false,
+        plan_overrides: {},
+        date_ranges: [],
+      };
+    }
+    return existing;
+  }
+
+  function setBaseVal(agentId, planId, newVal, isUpgrade) {
+    setOverridesByAgent((prev) => {
+      const oldRow = prev[agentId] || {
+        id: null,
+        manager_id: managerId,
+        agent_id,
+        is_fidium: false,
+        plan_overrides: {},
+        date_ranges: [],
+      };
+      const oldPlanOverrides = oldRow.plan_overrides || {};
+      const oldPlanObj = oldPlanOverrides[planId] || { base: "0", upgrade: "0" };
+      return {
+        ...prev,
+        [agentId]: {
+          ...oldRow,
+          plan_overrides: {
+            ...oldPlanOverrides,
+            [planId]: {
+              ...oldPlanObj,
+              [isUpgrade ? "upgrade" : "base"]: newVal,
+            },
+          },
+        },
+      };
+    });
+  }
+
+  function getAgentDateRanges(agentId) {
+    return getOrCreateOverrideRow(agentId).date_ranges || [];
+  }
+
+  function setAgentDateRanges(agentId, newRanges) {
+    setOverridesByAgent((prev) => {
+      const oldRow = getOrCreateOverrideRow(agentId);
+      return {
+        ...prev,
+        [agentId]: {
+          ...oldRow,
+          date_ranges: newRanges,
+        },
+      };
+    });
+  }
+
+  async function handleSave() {
+    // upsert each row
+    const assignedAgents = getAssignedAgents(managerId);
+    // Also incorporate those in overridesByAgent (maybe not assigned anymore, but let's keep them if you want).
+    const allAgentIds = new Set([...assignedAgents.map((a) => a.id), ...Object.keys(overridesByAgent)]);
+
+    const rowsToUpsert = [];
+    for (const agentId of allAgentIds) {
+      const rowObj = getOrCreateOverrideRow(agentId);
+      rowsToUpsert.push({
+        id: rowObj.id || undefined,
+        manager_id: rowObj.manager_id,
+        agent_id: rowObj.agent_id,
+        is_fidium: false,
+        plan_overrides: rowObj.plan_overrides || {},
+        date_ranges: rowObj.date_ranges || [],
+      });
+    }
+
+    for (const item of rowsToUpsert) {
+      const { error } = await supabase.from("manager_overrides").upsert(item).select("*").single();
+      if (error) {
+        console.error("Error upserting manager_overrides row:", error);
+      }
+    }
+
+    onClose();
+  }
+
+  // If there's literally no managers, show empty state
+  if (managerList.length === 0) {
+    return (
+      <Dialog open onClose={onClose} size="md">
+        <DialogTitle>Manager Overrides ({payscaleName})</DialogTitle>
+        <DialogBody>No managers found.</DialogBody>
+        <DialogActions>
+          <Button onClick={onClose}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open onClose={onClose} size="xl">
+      <DialogTitle>Manager Overrides ({payscaleName})</DialogTitle>
+      <DialogBody>
+        <Field className="mb-4">
+          <Label>Select Manager</Label>
+          <Select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+            {managerList.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name || m.identifier}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <hr className="my-4" />
+
+        {getAssignedAgents(managerId).length === 0 && (
+          <div className="text-sm text-gray-600">
+            No assigned agents for this manager.
+          </div>
+        )}
+        {getAssignedAgents(managerId).map((agt) => {
+          const overrideRow = getOrCreateOverrideRow(agt.id);
+          return (
+            <div key={agt.id} className="mb-6 border-b pb-4">
+              <h3 className="text-lg font-semibold mb-2">
+                Agent: {agt.name || agt.identifier}
+              </h3>
+
+              <p className="text-sm font-medium text-gray-600 mb-2">
+                Plan Overrides (Base/Upgrade):
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {plans.map((p) => {
+                  const planObj = overrideRow.plan_overrides?.[p.id] || { base: "0", upgrade: "0" };
+                  return (
+                    <div key={p.id} className="border p-2 rounded bg-white text-sm">
+                      <div className="font-medium mb-1">{p.name}</div>
+                      <Field className="flex items-center mb-1">
+                        <Label className="w-1/3 text-xs">Base($)</Label>
+                        <Input
+                          type="number"
+                          value={planObj.base}
+                          onChange={(e) =>
+                            setBaseVal(agt.id, p.id, e.target.value, false)
+                          }
+                        />
+                      </Field>
+                      <Field className="flex items-center">
+                        <Label className="w-1/3 text-xs">Upgr($)</Label>
+                        <Input
+                          type="number"
+                          value={planObj.upgrade}
+                          onChange={(e) =>
+                            setBaseVal(agt.id, p.id, e.target.value, true)
+                          }
+                        />
+                      </Field>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-sm font-medium text-gray-600 mt-4 mb-2">
+                Date Range Overrides
+              </p>
+              <DateRangeManager
+                plans={plans}
+                dateRanges={overrideRow.date_ranges}
+                setDateRanges={(newRanges) => setAgentDateRanges(agt.id, newRanges)}
+                label="Override Commission Amounts by Date"
+              />
+            </div>
+          );
+        })}
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave}>Save All</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/TabFidiumManagerPayscales.jsx
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/button";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/table";
+import AddFidiumManagerModal from "./modals/AddFidiumManagerModal";
+import EditFidiumManagerModal from "./modals/EditFidiumManagerModal";
+import FidiumManagerOverridesModal from "./modals/FidiumManagerOverridesModal";
+
+export default function TabFidiumManagerPayscales({
+  fidiumPlans,
+  fidiumManagerPayscales,
+  agents,
+  agentManagers,
+  supabase,
+  onRefresh,
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [overrideItem, setOverrideItem] = useState(null);
+
+  return (
+    <>
+      <div className="mb-4 flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Fidium Manager Payscales</h2>
+        <Button onClick={() => setShowAdd(true)}>Add Fidium Manager</Button>
+      </div>
+
+      <Table striped>
+        <TableHead>
+          <TableRow>
+            <TableHeader>Name</TableHeader>
+            <TableHeader>Commissions</TableHeader>
+            <TableHeader>Actions</TableHeader>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {fidiumManagerPayscales.map((p) => (
+            <TableRow key={p.id}>
+              <TableCell>{p.name}</TableCell>
+              <TableCell>
+                {p.manager_payscale_plan_commissions?.map((c) => (
+                  <div key={c.id}>
+                    Plan #{c.fidium_plan_id}: ${c.manager_commission_value}
+                  </div>
+                ))}
+              </TableCell>
+              <TableCell className="space-x-2">
+                <Button size="sm" onClick={() => setEditItem(p)}>
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setOverrideItem(p)}
+                >
+                  Overrides
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      {showAdd && (
+        <AddFidiumManagerModal
+          fidiumPlans={fidiumPlans}
+          supabase={supabase}
+          onClose={() => {
+            setShowAdd(false);
+            onRefresh();
+          }}
+        />
+      )}
+
+      {editItem && (
+        <EditFidiumManagerModal
+          payscale={editItem}
+          fidiumPlans={fidiumPlans}
+          supabase={supabase}
+          onClose={() => {
+            setEditItem(null);
+            onRefresh();
+          }}
+        />
+      )}
+
+      {overrideItem && (
+        <FidiumManagerOverridesModal
+          payscale={overrideItem}
+          agents={agents}
+          agentManagers={agentManagers}
+          fidiumPlans={fidiumPlans}
+          supabase={supabase}
+          onClose={() => {
+            setOverrideItem(null);
+            onRefresh();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/TabFidiumPersonalPayscales.jsx
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/button";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/table";
+import AddFidiumPersonalModal from "./modals/AddFidiumPersonalModal";
+import EditFidiumPersonalModal from "./modals/EditFidiumPersonalModal";
+
+export default function TabFidiumPersonalPayscales({
+  fidiumPlans,
+  fidiumPersonalPayscales,
+  supabase,
+  onRefresh,
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+
+  return (
+    <>
+      <div className="mb-4 flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Fidium Personal Payscales</h2>
+        <Button onClick={() => setShowAdd(true)}>Add Fidium Personal</Button>
+      </div>
+
+      <Table striped>
+        <TableHead>
+          <TableRow>
+            <TableHeader>Name</TableHeader>
+            <TableHeader>Upfront (%)</TableHeader>
+            <TableHeader>Backend (%)</TableHeader>
+            <TableHeader>Commissions</TableHeader>
+            <TableHeader>Actions</TableHeader>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {fidiumPersonalPayscales.map((p) => (
+            <TableRow key={p.id}>
+              <TableCell>{p.name}</TableCell>
+              <TableCell>{p.upfront_percentage}%</TableCell>
+              <TableCell>{p.backend_percentage}%</TableCell>
+              <TableCell>
+                {p.personal_payscale_plan_commissions?.map((c) => (
+                  <div key={c.id}>
+                    Plan #{c.fidium_plan_id}: ${c.rep_commission_value}
+                  </div>
+                ))}
+              </TableCell>
+              <TableCell>
+                <Button size="sm" onClick={() => setEditItem(p)}>
+                  Edit
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      {showAdd && (
+        <AddFidiumPersonalModal
+          fidiumPlans={fidiumPlans}
+          supabase={supabase}
+          onClose={() => {
+            setShowAdd(false);
+            onRefresh();
+          }}
+        />
+      )}
+
+      {editItem && (
+        <EditFidiumPersonalModal
+          payscale={editItem}
+          fidiumPlans={fidiumPlans}
+          supabase={supabase}
+          onClose={() => {
+            setEditItem(null);
+            onRefresh();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/TabManagerPayscales.jsx
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/button";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/table";
+import AddManagerPayscaleModal from "./modals/AddManagerPayscaleModal";
+import EditManagerPayscaleModal from "./modals/EditManagerPayscaleModal";
+import ManagerOverridesModal from "./modals/ManagerOverridesModal";
+
+export default function TabManagerPayscales({
+  plans,
+  managerPayscales,
+  agents,
+  agentManagers,
+  supabase,
+  onRefresh,
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [overrideItem, setOverrideItem] = useState(null);
+
+  return (
+    <>
+      <div className="mb-4 flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Manager Payscales</h2>
+        <Button onClick={() => setShowAdd(true)}>Add Manager Payscale</Button>
+      </div>
+
+      <Table striped>
+        <TableHead>
+          <TableRow>
+            <TableHeader>Name</TableHeader>
+            <TableHeader>Commissions</TableHeader>
+            <TableHeader>Actions</TableHeader>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {managerPayscales.map((p) => (
+            <TableRow key={p.id}>
+              <TableCell>{p.name}</TableCell>
+              <TableCell>
+                {p.manager_payscale_plan_commissions?.map((c) => (
+                  <div key={c.id}>
+                    Plan #{c.plan_id}: ${c.manager_commission_value} / UPG: $
+                    {c.manager_upgrade_commission_value}
+                  </div>
+                ))}
+              </TableCell>
+              <TableCell className="space-x-2">
+                <Button size="sm" onClick={() => setEditItem(p)}>
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setOverrideItem(p)}
+                >
+                  Overrides
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      {showAdd && (
+        <AddManagerPayscaleModal
+          plans={plans}
+          supabase={supabase}
+          onClose={() => {
+            setShowAdd(false);
+            onRefresh();
+          }}
+        />
+      )}
+
+      {editItem && (
+        <EditManagerPayscaleModal
+          payscale={editItem}
+          plans={plans}
+          supabase={supabase}
+          onClose={() => {
+            setEditItem(null);
+            onRefresh();
+          }}
+        />
+      )}
+
+      {overrideItem && (
+        <ManagerOverridesModal
+          payscale={overrideItem}
+          agents={agents}
+          agentManagers={agentManagers}
+          plans={plans}
+          supabase={supabase}
+          onClose={() => {
+            setOverrideItem(null);
+            onRefresh();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/TabPersonalPayscales.jsx
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/button";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/table";
+import AddPersonalPayscaleModal from "./modals/AddPersonalPayscaleModal";
+import EditPersonalPayscaleModal from "./modals/EditPersonalPayscaleModal";
+
+export default function TabPersonalPayscales({
+  plans,
+  personalPayscales,
+  supabase,
+  onRefresh,
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+
+  return (
+    <>
+      <div className="mb-4 flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Personal Payscales</h2>
+        <Button onClick={() => setShowAdd(true)}>Add Personal Payscale</Button>
+      </div>
+
+      <Table striped>
+        <TableHead>
+          <TableRow>
+            <TableHeader>Name</TableHeader>
+            <TableHeader>Upfront (%)</TableHeader>
+            <TableHeader>Backend (%)</TableHeader>
+            <TableHeader>Commissions</TableHeader>
+            <TableHeader>Actions</TableHeader>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {personalPayscales.map((p) => (
+            <TableRow key={p.id}>
+              <TableCell>{p.name}</TableCell>
+              <TableCell>{p.upfront_percentage}%</TableCell>
+              <TableCell>{p.backend_percentage}%</TableCell>
+              <TableCell>
+                {p.personal_payscale_plan_commissions?.map((c) => (
+                  <div key={c.id}>
+                    Plan #{c.plan_id}: ${c.rep_commission_value} / UPG: $
+                    {c.rep_upgrade_commission_value}
+                  </div>
+                ))}
+              </TableCell>
+              <TableCell>
+                <Button size="sm" onClick={() => setEditItem(p)}>
+                  Edit
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      {showAdd && (
+        <AddPersonalPayscaleModal
+          plans={plans}
+          supabase={supabase}
+          onClose={() => {
+            setShowAdd(false);
+            onRefresh();
+          }}
+        />
+      )}
+
+      {editItem && (
+        <EditPersonalPayscaleModal
+          payscale={editItem}
+          plans={plans}
+          supabase={supabase}
+          onClose={() => {
+            setEditItem(null);
+            onRefresh();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/TabPlans.jsx
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/button";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/table";
+import AddPlanModal from "./modals/AddPlanModal";
+
+export default function TabPlans({ plans, supabase, onRefresh }) {
+  const [showAdd, setShowAdd] = useState(false);
+
+  return (
+    <>
+      <div className="mb-4 flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">Plans</h2>
+          <p className="text-sm text-gray-400">
+            (Plan name must match the White Glove CSV)
+          </p>
+        </div>
+        <Button onClick={() => setShowAdd(true)}>Add Plan</Button>
+      </div>
+
+      <Table striped>
+        <TableHead>
+          <TableRow>
+            <TableHeader>Plan Name</TableHeader>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {plans.map((plan) => (
+            <TableRow key={plan.id}>
+              <TableCell>{plan.name}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      {showAdd && (
+        <AddPlanModal
+          supabase={supabase}
+          onClose={() => {
+            setShowAdd(false);
+            onRefresh();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+
+
+// app/protected/payscales/tabs/TabUsers.jsx
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/button";
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/table";
+import AddAgentModal from "./modals/AddAgentModal";
+import EditAgentModal from "./modals/EditAgentModal";
+
+export default function TabUsers({
+  agents,
+  agentManagers,
+  personalPayscales,
+  managerPayscales,
+  fidiumPersonalPayscales,
+  fidiumManagerPayscales,
+  fidiumSalesmen,
+  supabase,
+  onRefresh,
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [editAgent, setEditAgent] = useState(null);
+
+  function getAssignedAgentsForManager(managerId) {
+    const assignedIds = agentManagers
+      .filter((am) => am.manager_id === managerId)
+      .map((am) => am.agent_id);
+    return agents.filter((a) => assignedIds.includes(a.id));
+  }
+
+  return (
+    <>
+      <div className="mb-4 flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Users</h2>
+        <Button onClick={() => setShowAdd(true)}>Add User</Button>
+      </div>
+
+      <Table striped>
+        <TableHead>
+          <TableRow>
+            <TableHeader>Name</TableHeader>
+            <TableHeader>Identifier</TableHeader>
+            <TableHeader>Fidium ID</TableHeader>
+            <TableHeader>Personal Payscale</TableHeader>
+            <TableHeader>Manager Payscale</TableHeader>
+            <TableHeader>Fidium Personal</TableHeader>
+            <TableHeader>Fidium Manager</TableHeader>
+            <TableHeader>Is Manager</TableHeader>
+            <TableHeader>Assigned Agents</TableHeader>
+            <TableHeader>Actions</TableHeader>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {agents.map((agent) => {
+            const assigned = getAssignedAgentsForManager(agent.id);
+            const personal = personalPayscales.find((x) => x.id === agent.personal_payscale_id);
+            const manager = managerPayscales.find((x) => x.id === agent.manager_payscale_id);
+            const fidPers = fidiumPersonalPayscales.find((x) => x.id === agent.fidium_personal_payscale_id);
+            const fidMgr = fidiumManagerPayscales.find((x) => x.id === agent.fidium_manager_payscale_id);
+
+            return (
+              <TableRow key={agent.id}>
+                <TableCell>{agent.name}</TableCell>
+                <TableCell>{agent.identifier}</TableCell>
+                <TableCell>{agent.fidium_identifier || ""}</TableCell>
+                <TableCell>{personal?.name || "N/A"}</TableCell>
+                <TableCell>{agent.is_manager ? manager?.name || "N/A" : "N/A"}</TableCell>
+                <TableCell>{fidPers?.name || "N/A"}</TableCell>
+                <TableCell>{agent.is_manager ? fidMgr?.name || "N/A" : "N/A"}</TableCell>
+                <TableCell>{agent.is_manager ? "Yes" : "No"}</TableCell>
+                <TableCell>
+                  {assigned.length > 0
+                    ? assigned.map((a) => a.name || a.identifier).join(", ")
+                    : "—"}
+                </TableCell>
+                <TableCell>
+                  <Button size="sm" onClick={() => setEditAgent(agent)}>
+                    Edit
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+
+      {showAdd && (
+        <AddAgentModal
+          supabase={supabase}
+          personalPayscales={personalPayscales}
+          managerPayscales={managerPayscales}
+          fidiumPersonalPayscales={fidiumPersonalPayscales}
+          fidiumManagerPayscales={fidiumManagerPayscales}
+          onClose={() => {
+            setShowAdd(false);
+            onRefresh();
+          }}
+        />
+      )}
+
+      {editAgent && (
+        <EditAgentModal
+          agent={editAgent}
+          supabase={supabase}
+          allAgents={agents}
+          agentManagers={agentManagers}
+          personalPayscales={personalPayscales}
+          managerPayscales={managerPayscales}
+          fidiumPersonalPayscales={fidiumPersonalPayscales}
+          fidiumManagerPayscales={fidiumManagerPayscales}
+          fidiumSalesmen={fidiumSalesmen}
+          onClose={() => {
+            setEditAgent(null);
+            onRefresh();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+
+
+// app/protected/payscales/page.jsx
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { Tab } from "@headlessui/react";
+import TabUsers from "./tabs/TabUsers";
+import TabPlans from "./tabs/TabPlans";
+import TabPersonalPayscales from "./tabs/TabPersonalPayscales";
+import TabManagerPayscales from "./tabs/TabManagerPayscales";
+import TabFidiumPersonalPayscales from "./tabs/TabFidiumPersonalPayscales";
+import TabFidiumManagerPayscales from "./tabs/TabFidiumManagerPayscales";
+
+export default function PayscalesPage() {
+  const supabase = useMemo(() => createClient(), []);
+  const [loading, setLoading] = useState(true);
+
+  const [plans, setPlans] = useState([]);
+  const [fidiumPlans, setFidiumPlans] = useState([]);
+  const [agents, setAgents] = useState([]);
+  const [agentManagers, setAgentManagers] = useState([]);
+  const [personalPayscales, setPersonalPayscales] = useState([]);
+  const [managerPayscales, setManagerPayscales] = useState([]);
+  const [fidiumPersonalPayscales, setFidiumPersonalPayscales] = useState([]);
+  const [fidiumManagerPayscales, setFidiumManagerPayscales] = useState([]);
+  const [fidiumSalesmen, setFidiumSalesmen] = useState([]);
+
+  useEffect(() => {
+    fetchAllData().finally(() => setLoading(false));
+  }, []);
+
+  async function fetchAllData() {
+    await Promise.all([
+      fetchPlans(),
+      fetchFidiumPlans(),
+      fetchAgents(),
+      fetchAgentManagers(),
+      fetchPersonalPayscales(),
+      fetchManagerPayscales(),
+      fetchFidiumPersonalPayscales(),
+      fetchFidiumManagerPayscales(),
+      fetchFidiumSalesmen(),
+    ]);
+  }
+
+  async function fetchPlans() {
+    const { data } = await supabase.from("plans").select("*").order("id");
+    setPlans(data || []);
+  }
+
+  async function fetchFidiumPlans() {
+    const { data } = await supabase.from("fidium_plans").select("*").order("id");
+    setFidiumPlans(data || []);
+  }
+
+  async function fetchAgents() {
+    const { data } = await supabase.from("agents").select("*").order("id");
+    setAgents(data || []);
+  }
+
+  async function fetchAgentManagers() {
+    const { data } = await supabase.from("agent_managers").select("*");
+    setAgentManagers(data || []);
+  }
+
+  async function fetchPersonalPayscales() {
+    const { data: payscales } = await supabase
+      .from("personal_payscales")
+      .select("*")
+      .order("id");
+    const { data: commissions } = await supabase
+      .from("personal_payscale_plan_commissions")
+      .select("*");
+
+    setPersonalPayscales(
+      (payscales || []).map((p) => ({
+        ...p,
+        personal_payscale_plan_commissions: (commissions || []).filter(
+          (c) => c.personal_payscale_id === p.id
+        ),
+      }))
+    );
+  }
+
+  async function fetchManagerPayscales() {
+    const { data: payscales } = await supabase
+      .from("manager_payscales")
+      .select("*")
+      .order("id");
+    const { data: commissions } = await supabase
+      .from("manager_payscale_plan_commissions")
+      .select("*");
+
+    setManagerPayscales(
+      (payscales || []).map((p) => ({
+        ...p,
+        manager_payscale_plan_commissions: (commissions || []).filter(
+          (c) => c.manager_payscale_id === p.id
+        ),
+      }))
+    );
+  }
+
+  async function fetchFidiumPersonalPayscales() {
+    const { data: payscales } = await supabase
+      .from("fidium_personal_payscales")
+      .select("*")
+      .order("id");
+    const { data: commissions } = await supabase
+      .from("fidium_personal_payscale_plan_commissions")
+      .select("*");
+
+    setFidiumPersonalPayscales(
+      (payscales || []).map((p) => ({
+        ...p,
+        personal_payscale_plan_commissions: (commissions || []).filter(
+          (c) => c.fidium_personal_payscale_id === p.id
+        ),
+      }))
+    );
+  }
+
+  async function fetchFidiumManagerPayscales() {
+    const { data: payscales } = await supabase
+      .from("fidium_manager_payscales")
+      .select("*")
+      .order("id");
+    const { data: commissions } = await supabase
+      .from("fidium_manager_payscale_plan_commissions")
+      .select("*");
+
+    setFidiumManagerPayscales(
+      (payscales || []).map((p) => ({
+        ...p,
+        manager_payscale_plan_commissions: (commissions || []).filter(
+          (c) => c.fidium_manager_payscale_id === p.id
+        ),
+      }))
+    );
+  }
+
+  async function fetchFidiumSalesmen() {
+    const { data } = await supabase.from("fidium_salesmen").select("*");
+    setFidiumSalesmen(data || []);
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div>LOADING...</div>
+      </div>
+    );
+  }
+
+  const tabs = [
+    "Users",
+    "Plans",
+    "Personal Payscales",
+    "Manager Payscales",
+    "Fidium Personal",
+    "Fidium Manager",
+  ];
+
+  return (
+    <div className="p-4">
+      <Tab.Group>
+        <Tab.List className="flex space-x-4 border-b mb-4">
+          {tabs.map((label) => (
+            <Tab
+              key={label}
+              className={({ selected }) =>
+                selected
+                  ? "px-4 py-2 font-semibold text-blue-500 border-b-2 border-blue-500"
+                  : "px-4 py-2 text-gray-700 hover:text-blue-500"
+              }
+            >
+              {label}
+            </Tab>
+          ))}
+        </Tab.List>
+
+        <Tab.Panels>
+          <Tab.Panel>
+            <TabUsers
+              agents={agents}
+              agentManagers={agentManagers}
+              personalPayscales={personalPayscales}
+              managerPayscales={managerPayscales}
+              fidiumPersonalPayscales={fidiumPersonalPayscales}
+              fidiumManagerPayscales={fidiumManagerPayscales}
+              fidiumSalesmen={fidiumSalesmen}
+              supabase={supabase}
+              onRefresh={fetchAllData}
+            />
+          </Tab.Panel>
+
+          <Tab.Panel>
+            <TabPlans plans={plans} supabase={supabase} onRefresh={fetchPlans} />
+          </Tab.Panel>
+
+          <Tab.Panel>
+            <TabPersonalPayscales
+              plans={plans}
+              personalPayscales={personalPayscales}
+              supabase={supabase}
+              onRefresh={fetchPersonalPayscales}
+            />
+          </Tab.Panel>
+
+          <Tab.Panel>
+            <TabManagerPayscales
+              plans={plans}
+              managerPayscales={managerPayscales}
+              agents={agents}
+              agentManagers={agentManagers}
+              supabase={supabase}
+              onRefresh={fetchManagerPayscales}
+            />
+          </Tab.Panel>
+
+          <Tab.Panel>
+            <TabFidiumPersonalPayscales
+              fidiumPlans={fidiumPlans}
+              fidiumPersonalPayscales={fidiumPersonalPayscales}
+              supabase={supabase}
+              onRefresh={fetchFidiumPersonalPayscales}
+            />
+          </Tab.Panel>
+
+          <Tab.Panel>
+            <TabFidiumManagerPayscales
+              fidiumPlans={fidiumPlans}
+              fidiumManagerPayscales={fidiumManagerPayscales}
+              agents={agents}
+              agentManagers={agentManagers}
+              supabase={supabase}
+              onRefresh={fetchFidiumManagerPayscales}
+            />
+          </Tab.Panel>
+        </Tab.Panels>
+      </Tab.Group>
+    </div>
+  );
+}
+

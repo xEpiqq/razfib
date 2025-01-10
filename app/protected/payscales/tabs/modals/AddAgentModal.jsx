@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
-import { Field, Label, Description } from "@/components/fieldset";
+import { Field, Label } from "@/components/fieldset";
 import { Input } from "@/components/input";
 import { Select } from "@/components/select";
 import { Checkbox, CheckboxField } from "@/components/checkbox";

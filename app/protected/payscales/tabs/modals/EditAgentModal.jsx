@@ -39,6 +39,7 @@ export default function EditAgentModal({
   });
 
   const [searchVal, setSearchVal] = useState("");
+  const [fidiumSearch, setFidiumSearch] = useState("");
 
   // Agents that can be assigned to this manager
   const assignable = allAgents.filter(
@@ -51,9 +52,6 @@ export default function EditAgentModal({
           .includes(searchVal.toLowerCase())
       )
     : assignable;
-
-  // Searching Fidium salesmen
-  const [fidiumSearch, setFidiumSearch] = useState("");
 
   async function updateAgent() {
     await supabase
@@ -75,11 +73,11 @@ export default function EditAgentModal({
     // Reassign agent_managers
     await supabase.from("agent_managers").delete().eq("manager_id", form.id);
     if (form.is_manager && form.assignedAgents.length > 0) {
-      const arr = form.assignedAgents.map((aid) => ({
+      const rows = form.assignedAgents.map((aid) => ({
         agent_id: aid,
         manager_id: form.id,
       }));
-      await supabase.from("agent_managers").insert(arr);
+      await supabase.from("agent_managers").insert(rows);
     }
     onClose();
   }
@@ -113,7 +111,7 @@ export default function EditAgentModal({
               setFidiumSearch(e.target.value);
             }}
           />
-          {/** If user typed something, show possible Fidium Salesmen */}
+          {/* Fidium Salesmen suggestions */}
           {fidiumSearch && (
             <div className="mt-2 border p-2 rounded max-h-48 overflow-auto bg-white">
               {fidiumSalesmen
@@ -166,7 +164,9 @@ export default function EditAgentModal({
             <Label>Manager Payscale</Label>
             <Select
               value={form.manager_payscale_id}
-              onChange={(e) => setForm({ ...form, manager_payscale_id: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, manager_payscale_id: e.target.value })
+              }
             >
               <option value="">(None)</option>
               {managerPayscales.map((p) => (
@@ -214,7 +214,7 @@ export default function EditAgentModal({
           </Field>
         )}
 
-        {/* Assign Agents if manager */}
+        {/* If manager, show assigned agents */}
         {form.is_manager && (
           <Field className="mb-4">
             <Label>Assigned Agents</Label>

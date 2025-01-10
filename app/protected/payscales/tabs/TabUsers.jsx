@@ -44,6 +44,7 @@ export default function TabUsers({
       <Table striped>
         <TableHead>
           <TableRow>
+            <TableHeader>Actions</TableHeader>
             <TableHeader>Name</TableHeader>
             <TableHeader>Identifier</TableHeader>
             <TableHeader>Fidium ID</TableHeader>
@@ -53,7 +54,6 @@ export default function TabUsers({
             <TableHeader>Fidium Manager</TableHeader>
             <TableHeader>Is Manager</TableHeader>
             <TableHeader>Assigned Agents</TableHeader>
-            <TableHeader>Actions</TableHeader>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -66,23 +66,28 @@ export default function TabUsers({
 
             return (
               <TableRow key={agent.id}>
+                {/* Edit button now on the left */}
+                <TableCell>
+                  <Button size="sm" onClick={() => setEditAgent(agent)}>
+                    Edit
+                  </Button>
+                </TableCell>
                 <TableCell>{agent.name}</TableCell>
                 <TableCell>{agent.identifier}</TableCell>
                 <TableCell>{agent.fidium_identifier || ""}</TableCell>
                 <TableCell>{personal?.name || "N/A"}</TableCell>
-                <TableCell>{agent.is_manager ? manager?.name || "N/A" : "N/A"}</TableCell>
+                <TableCell>
+                  {agent.is_manager ? manager?.name || "N/A" : "N/A"}
+                </TableCell>
                 <TableCell>{fidPers?.name || "N/A"}</TableCell>
-                <TableCell>{agent.is_manager ? fidMgr?.name || "N/A" : "N/A"}</TableCell>
+                <TableCell>
+                  {agent.is_manager ? fidMgr?.name || "N/A" : "N/A"}
+                </TableCell>
                 <TableCell>{agent.is_manager ? "Yes" : "No"}</TableCell>
                 <TableCell>
                   {assigned.length > 0
                     ? assigned.map((a) => a.name || a.identifier).join(", ")
                     : "—"}
-                </TableCell>
-                <TableCell>
-                  <Button size="sm" onClick={() => setEditAgent(agent)}>
-                    Edit
-                  </Button>
                 </TableCell>
               </TableRow>
             );

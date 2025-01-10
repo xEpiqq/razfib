@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
 import { Field, Label } from "@/components/fieldset";
 import { Input } from "@/components/input";
 import { Button } from "@/components/button";
+import DateRangeManagerFidium from "./DateRangeManagerFidium";
 
 export default function EditFidiumPersonalModal({
   payscale,
@@ -23,6 +24,36 @@ export default function EditFidiumPersonalModal({
     backend_percentage: payscale.backend_percentage.toString(),
     commissions: { ...commObj },
   });
+
+  const [dateRanges, setDateRanges] = useState([]);
+
+  async function loadExistingDateRanges() {
+    const { data } = await supabase
+      .from("fidium_personal_payscale_date_ranges")
+      .select("*, fidium_personal_payscale_date_range_plan_commissions(*)")
+      .eq("fidium_personal_payscale_id", payscale.id);
+    if (!data) return;
+    const converted = data.map((dr) => {
+      const planValues = {};
+      for (const pc of dr.fidium_personal_payscale_date_range_plan_commissions) {
+        planValues[pc.fidium_plan_id] = {
+          base: pc.rep_commission_value.toString(),
+        };
+      }
+      return {
+        id: dr.id,
+        start_date: dr.start_date,
+        end_date: dr.end_date,
+        planValues,
+      };
+    });
+    setDateRanges(converted);
+  }
+
+  useEffect(() => {
+    loadExistingDateRanges();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function updateCommission(planId, value) {
     setForm((prev) => ({
@@ -45,13 +76,13 @@ export default function EditFidiumPersonalModal({
       })
       .eq("id", payscale.id);
 
-    // 2) Remove old
+    // 2) Remove old base commissions
     await supabase
       .from("fidium_personal_payscale_plan_commissions")
       .delete()
       .eq("fidium_personal_payscale_id", payscale.id);
 
-    // 3) Insert new
+    // 3) Insert new base commissions
     const arr = fidiumPlans.map((fp) => ({
       fidium_personal_payscale_id: payscale.id,
       fidium_plan_id: fp.id,
@@ -59,6 +90,42 @@ export default function EditFidiumPersonalModal({
       rep_commission_value: parseFloat(form.commissions[fp.id] || "0"),
     }));
     await supabase.from("fidium_personal_payscale_plan_commissions").insert(arr);
+
+    // 4) Remove old date ranges
+    await supabase
+      .from("fidium_personal_payscale_date_ranges")
+      .delete()
+      .eq("fidium_personal_payscale_id", payscale.id);
+
+    // 5) Insert new date ranges
+    for (const dr of dateRanges) {
+      const { data: insertedRange } = await supabase
+        .from("fidium_personal_payscale_date_ranges")
+        .insert([
+          {
+            fidium_personal_payscale_id: payscale.id,
+            start_date: dr.start_date,
+            end_date: dr.end_date || null,
+          },
+        ])
+        .select("*")
+        .single();
+      if (!insertedRange) continue;
+
+      const planCommArr = [];
+      for (const fp of fidiumPlans) {
+        const baseVal = dr.planValues[fp.id]?.base || "0";
+        planCommArr.push({
+          fidium_personal_payscale_date_range_id: insertedRange.id,
+          fidium_plan_id: fp.id,
+          rep_commission_type: "fixed_amount",
+          rep_commission_value: parseFloat(baseVal),
+        });
+      }
+      await supabase
+        .from("fidium_personal_payscale_date_range_plan_commissions")
+        .insert(planCommArr);
+    }
 
     onClose();
   }
@@ -98,7 +165,7 @@ export default function EditFidiumPersonalModal({
           </Field>
         </div>
 
-        <h3 className="font-semibold mb-2">Commissions (Fidium plans)</h3>
+        <h3 className="font-semibold mb-2">Base Commissions (per Fidium plan)</h3>
         {fidiumPlans.map((fp) => (
           <Field key={fp.id} className="mb-2 flex items-center">
             <Label className="w-1/2">{fp.name}</Label>
@@ -112,6 +179,15 @@ export default function EditFidiumPersonalModal({
             </div>
           </Field>
         ))}
+
+        <hr className="my-4" />
+
+        <DateRangeManagerFidium
+          fidiumPlans={fidiumPlans}
+          dateRanges={dateRanges}
+          setDateRanges={setDateRanges}
+          label="Date Ranges"
+        />
       </DialogBody>
       <DialogActions>
         <Button plain onClick={onClose}>

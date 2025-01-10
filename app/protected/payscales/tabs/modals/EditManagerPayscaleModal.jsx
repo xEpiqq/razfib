@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
 import { Field, Label } from "@/components/fieldset";
 import { Input } from "@/components/input";
 import { Button } from "@/components/button";
+import DateRangeManager from "./DateRangeManager";
 
 export default function EditManagerPayscaleModal({ payscale, plans, supabase, onClose }) {
   const commObj = {};
@@ -19,6 +20,37 @@ export default function EditManagerPayscaleModal({ payscale, plans, supabase, on
     commissions: { ...commObj },
     upgradeCommissions: { ...upgObj },
   });
+
+  const [dateRanges, setDateRanges] = useState([]);
+
+  async function loadExistingDateRanges() {
+    const { data } = await supabase
+      .from("manager_payscale_date_ranges")
+      .select("*, manager_payscale_date_range_plan_commissions(*)")
+      .eq("manager_payscale_id", payscale.id);
+    if (!data) return;
+    const converted = data.map((dr) => {
+      const planValues = {};
+      for (const pc of dr.manager_payscale_date_range_plan_commissions) {
+        planValues[pc.plan_id] = {
+          base: pc.manager_commission_value.toString(),
+          upgrade: pc.manager_upgrade_commission_value.toString(),
+        };
+      }
+      return {
+        id: dr.id,
+        start_date: dr.start_date,
+        end_date: dr.end_date,
+        planValues,
+      };
+    });
+    setDateRanges(converted);
+  }
+
+  useEffect(() => {
+    loadExistingDateRanges();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function updateCommission(planId, value, isUpgrade = false) {
     if (isUpgrade) {
@@ -35,16 +67,19 @@ export default function EditManagerPayscaleModal({ payscale, plans, supabase, on
   }
 
   async function saveChanges() {
-    // 1) Update name
-    await supabase.from("manager_payscales").update({ name: form.name.trim() }).eq("id", payscale.id);
+    // 1) Update payscale name
+    await supabase
+      .from("manager_payscales")
+      .update({ name: form.name.trim() })
+      .eq("id", payscale.id);
 
-    // 2) Remove old commissions
+    // 2) Remove old base commissions
     await supabase
       .from("manager_payscale_plan_commissions")
       .delete()
       .eq("manager_payscale_id", payscale.id);
 
-    // 3) Insert new
+    // 3) Insert new base commissions
     const arr = plans.map((p) => ({
       manager_payscale_id: payscale.id,
       plan_id: p.id,
@@ -56,6 +91,44 @@ export default function EditManagerPayscaleModal({ payscale, plans, supabase, on
       ),
     }));
     await supabase.from("manager_payscale_plan_commissions").insert(arr);
+
+    // 4) Remove old date ranges
+    await supabase
+      .from("manager_payscale_date_ranges")
+      .delete()
+      .eq("manager_payscale_id", payscale.id);
+
+    // 5) Re-insert date ranges
+    for (const dr of dateRanges) {
+      const { data: insertedRange } = await supabase
+        .from("manager_payscale_date_ranges")
+        .insert([
+          {
+            manager_payscale_id: payscale.id,
+            start_date: dr.start_date,
+            end_date: dr.end_date || null,
+          },
+        ])
+        .select("*")
+        .single();
+      if (!insertedRange) continue;
+
+      const planCommArr = [];
+      for (const p of plans) {
+        const valObj = dr.planValues[p.id] || { base: "0", upgrade: "0" };
+        planCommArr.push({
+          manager_payscale_date_range_id: insertedRange.id,
+          plan_id: p.id,
+          manager_commission_type: "fixed_amount",
+          manager_commission_value: parseFloat(valObj.base || "0"),
+          manager_upgrade_commission_type: "fixed_amount",
+          manager_upgrade_commission_value: parseFloat(valObj.upgrade || "0"),
+        });
+      }
+      await supabase
+        .from("manager_payscale_date_range_plan_commissions")
+        .insert(planCommArr);
+    }
 
     onClose();
   }
@@ -72,7 +145,7 @@ export default function EditManagerPayscaleModal({ payscale, plans, supabase, on
           />
         </Field>
 
-        <h3 className="font-semibold mb-2">Commissions (per plan)</h3>
+        <h3 className="font-semibold mb-2">Base Commissions (per plan)</h3>
         {plans.map((p) => (
           <div key={p.id} className="border p-2 mb-2 rounded">
             <div className="font-medium mb-1">{p.name}</div>
@@ -94,6 +167,15 @@ export default function EditManagerPayscaleModal({ payscale, plans, supabase, on
             </Field>
           </div>
         ))}
+
+        <hr className="my-4" />
+
+        <DateRangeManager
+          plans={plans}
+          dateRanges={dateRanges}
+          setDateRanges={setDateRanges}
+          label="Date Ranges"
+        />
       </DialogBody>
       <DialogActions>
         <Button plain onClick={onClose}>

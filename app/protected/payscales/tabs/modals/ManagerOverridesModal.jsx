@@ -6,205 +6,249 @@ import { Field, Label } from "@/components/fieldset";
 import { Select } from "@/components/select";
 import { Input } from "@/components/input";
 import { Button } from "@/components/button";
+import DateRangeManager from "./DateRangeManager";
 
+/**
+ * Normal Manager Overrides using the new "manager_overrides" table with is_fidium=false.
+ *
+ * - managerList: array of manager objects => must not be undefined.
+ *   We'll default to an empty array if not provided.
+ * - assignedAgentsMap: function that returns an array of agents for a given managerId. Also default to [] if it returns nothing.
+ * - plans: array of plan objects => default to [] if not provided.
+ * - supabase instance
+ */
 export default function ManagerOverridesModal({
-  payscale,
-  agents,
-  agentManagers,
-  plans,
+  payscaleName = "My Payscale",
+  managerList = [],
+  assignedAgentsMap = () => [],
+  plans = [],
   supabase,
   onClose,
 }) {
-  // Find all managers using this payscale
-  const managersUsingThis = agents.filter(
-    (a) => a.is_manager && a.manager_payscale_id === payscale.id
-  );
-  const [managerId, setManagerId] = useState(
-    managersUsingThis[0]?.id || ""
-  );
+  // If managerList is empty, set managerId = "" to avoid TypeError
+  const initialManagerId = managerList.length > 0 ? managerList[0].id : "";
+  const [managerId, setManagerId] = useState(initialManagerId);
 
-  const [dbData, setDbData] = useState([]);
-  const [localData, setLocalData] = useState([]);
+  // { [agentId]: { id, manager_id, agent_id, plan_overrides, date_ranges } }
+  const [overridesByAgent, setOverridesByAgent] = useState({});
 
   useEffect(() => {
-    if (managerId) loadOverrides(managerId);
+    if (managerId) {
+      fetchOverrides(managerId);
+    } else {
+      setOverridesByAgent({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [managerId]);
 
-  async function loadOverrides(mId) {
-    const { data } = await supabase
-      .from("manager_agent_commissions")
+  async function fetchOverrides(mId) {
+    const { data, error } = await supabase
+      .from("manager_overrides")
       .select("*")
-      .eq("manager_id", mId);
-    setDbData(data || []);
-    setLocalData(data || []);
+      .eq("manager_id", mId)
+      .eq("is_fidium", false);
+
+    if (error) {
+      console.error("Error fetching overrides", error);
+      setOverridesByAgent({});
+      return;
+    }
+    const map = {};
+    (data || []).forEach((row) => {
+      map[row.agent_id] = row;
+    });
+    setOverridesByAgent(map);
   }
 
   function getAssignedAgents(mId) {
-    const assignedIds = agentManagers
-      .filter((am) => am.manager_id === mId)
-      .map((am) => am.agent_id);
-    return agents.filter((a) => assignedIds.includes(a.id));
+    const result = assignedAgentsMap(mId);
+    return Array.isArray(result) ? result : [];
   }
 
-  function getLocalVal(mId, agId, planId, isUpgrade = false) {
-    const found = localData.find(
-      (x) => x.manager_id === mId && x.agent_id === agId && x.plan_id === planId
-    );
-    if (!found) return "";
-    return isUpgrade
-      ? found.manager_upgrade_commission_value
-      : found.manager_commission_value;
+  function getOrCreateOverrideRow(agentId) {
+    const existing = overridesByAgent[agentId];
+    if (!existing) {
+      return {
+        id: null,
+        manager_id: managerId,
+        agent_id: agentId,
+        is_fidium: false,
+        plan_overrides: {},
+        date_ranges: [],
+      };
+    }
+    return existing;
   }
 
-  function setLocalVal(mId, agId, planId, newVal, isUpgrade = false) {
-    setLocalData((prev) => {
-      const idx = prev.findIndex(
-        (x) => x.manager_id === mId && x.agent_id === agId && x.plan_id === planId
-      );
-      if (idx >= 0) {
-        const updated = [...prev];
-        if (isUpgrade) {
-          updated[idx] = {
-            ...updated[idx],
-            manager_upgrade_commission_value: newVal,
-          };
-        } else {
-          updated[idx] = {
-            ...updated[idx],
-            manager_commission_value: newVal,
-          };
-        }
-        return updated;
-      } else {
-        return [
-          ...prev,
-          {
-            manager_id: mId,
-            agent_id: agId,
-            plan_id: planId,
-            manager_commission_type: "fixed_amount",
-            manager_commission_value: isUpgrade ? 0 : newVal,
-            manager_upgrade_commission_type: "fixed_amount",
-            manager_upgrade_commission_value: isUpgrade ? newVal : 0,
+  function setBaseVal(agentId, planId, newVal, isUpgrade) {
+    setOverridesByAgent((prev) => {
+      const oldRow = prev[agentId] || {
+        id: null,
+        manager_id: managerId,
+        agent_id,
+        is_fidium: false,
+        plan_overrides: {},
+        date_ranges: [],
+      };
+      const oldPlanOverrides = oldRow.plan_overrides || {};
+      const oldPlanObj = oldPlanOverrides[planId] || { base: "0", upgrade: "0" };
+      return {
+        ...prev,
+        [agentId]: {
+          ...oldRow,
+          plan_overrides: {
+            ...oldPlanOverrides,
+            [planId]: {
+              ...oldPlanObj,
+              [isUpgrade ? "upgrade" : "base"]: newVal,
+            },
           },
-        ];
-      }
+        },
+      };
     });
   }
 
-  function removeLocalOverride(mId, agId, planId) {
-    setLocalData((prev) =>
-      prev.filter(
-        (x) => !(x.manager_id === mId && x.agent_id === agId && x.plan_id === planId)
-      )
-    );
+  function getAgentDateRanges(agentId) {
+    return getOrCreateOverrideRow(agentId).date_ranges || [];
   }
 
-  async function save() {
-    // Delete old
-    await supabase.from("manager_agent_commissions").delete().eq("manager_id", managerId);
+  function setAgentDateRanges(agentId, newRanges) {
+    setOverridesByAgent((prev) => {
+      const oldRow = getOrCreateOverrideRow(agentId);
+      return {
+        ...prev,
+        [agentId]: {
+          ...oldRow,
+          date_ranges: newRanges,
+        },
+      };
+    });
+  }
 
-    // Insert non-zero overrides
-    const toInsert = localData
-      .filter(
-        (x) =>
-          parseFloat(x.manager_commission_value || "0") !== 0 ||
-          parseFloat(x.manager_upgrade_commission_value || "0") !== 0
-      )
-      .map((x) => ({
-        manager_id: x.manager_id,
-        agent_id: x.agent_id,
-        plan_id: x.plan_id,
-        manager_commission_type: x.manager_commission_type,
-        manager_commission_value: parseFloat(x.manager_commission_value || "0"),
-        manager_upgrade_commission_type: x.manager_upgrade_commission_type,
-        manager_upgrade_commission_value: parseFloat(
-          x.manager_upgrade_commission_value || "0"
-        ),
-      }));
-    if (toInsert.length > 0) {
-      await supabase.from("manager_agent_commissions").insert(toInsert);
+  async function handleSave() {
+    // upsert each row
+    const assignedAgents = getAssignedAgents(managerId);
+    // Also incorporate those in overridesByAgent (maybe not assigned anymore, but let's keep them if you want).
+    const allAgentIds = new Set([...assignedAgents.map((a) => a.id), ...Object.keys(overridesByAgent)]);
+
+    const rowsToUpsert = [];
+    for (const agentId of allAgentIds) {
+      const rowObj = getOrCreateOverrideRow(agentId);
+      rowsToUpsert.push({
+        id: rowObj.id || undefined,
+        manager_id: rowObj.manager_id,
+        agent_id: rowObj.agent_id,
+        is_fidium: false,
+        plan_overrides: rowObj.plan_overrides || {},
+        date_ranges: rowObj.date_ranges || [],
+      });
     }
+
+    for (const item of rowsToUpsert) {
+      const { error } = await supabase.from("manager_overrides").upsert(item).select("*").single();
+      if (error) {
+        console.error("Error upserting manager_overrides row:", error);
+      }
+    }
+
     onClose();
+  }
+
+  // If there's literally no managers, show empty state
+  if (managerList.length === 0) {
+    return (
+      <Dialog open onClose={onClose} size="md">
+        <DialogTitle>Manager Overrides ({payscaleName})</DialogTitle>
+        <DialogBody>No managers found.</DialogBody>
+        <DialogActions>
+          <Button onClick={onClose}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    );
   }
 
   return (
     <Dialog open onClose={onClose} size="xl">
-      <DialogTitle>Manager Overrides ({payscale.name})</DialogTitle>
+      <DialogTitle>Manager Overrides ({payscaleName})</DialogTitle>
       <DialogBody>
-        {managersUsingThis.length === 0 ? (
-          <div>No managers are currently using this payscale.</div>
-        ) : (
-          <>
-            <Field className="mb-4">
-              <Label>Select Manager</Label>
-              <Select
-                value={managerId}
-                onChange={(e) => setManagerId(e.target.value)}
-              >
-                {managersUsingThis.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name || m.identifier}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+        <Field className="mb-4">
+          <Label>Select Manager</Label>
+          <Select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+            {managerList.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name || m.identifier}
+              </option>
+            ))}
+          </Select>
+        </Field>
 
-            <div className="border rounded p-4 max-h-96 overflow-auto">
-              {getAssignedAgents(managerId).map((agt) => (
-                <div key={agt.id} className="mb-4">
-                  <h3 className="font-semibold mb-2">
-                    {agt.name || agt.identifier}
-                  </h3>
-                  {plans.map((pl) => {
-                    const baseVal = getLocalVal(managerId, agt.id, pl.id, false);
-                    const upgVal = getLocalVal(managerId, agt.id, pl.id, true);
-                    return (
-                      <div key={pl.id} className="border p-2 mb-2 rounded">
-                        <div className="font-medium mb-1">{pl.name}</div>
-                        <Field className="flex items-center mb-2">
-                          <Label className="w-1/3">Base ($)</Label>
-                          <Input
-                            type="number"
-                            value={baseVal}
-                            onChange={(e) =>
-                              setLocalVal(managerId, agt.id, pl.id, e.target.value, false)
-                            }
-                          />
-                        </Field>
-                        <Field className="flex items-center">
-                          <Label className="w-1/3">Upgrade ($)</Label>
-                          <Input
-                            type="number"
-                            value={upgVal}
-                            onChange={(e) =>
-                              setLocalVal(managerId, agt.id, pl.id, e.target.value, true)
-                            }
-                          />
-                        </Field>
-                        {(parseFloat(baseVal) || parseFloat(upgVal)) ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => removeLocalOverride(managerId, agt.id, pl.id)}
-                          >
-                            Remove
-                          </Button>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </>
+        <hr className="my-4" />
+
+        {getAssignedAgents(managerId).length === 0 && (
+          <div className="text-sm text-gray-600">
+            No assigned agents for this manager.
+          </div>
         )}
+        {getAssignedAgents(managerId).map((agt) => {
+          const overrideRow = getOrCreateOverrideRow(agt.id);
+          return (
+            <div key={agt.id} className="mb-6 border-b pb-4">
+              <h3 className="text-lg font-semibold mb-2">
+                Agent: {agt.name || agt.identifier}
+              </h3>
+
+              <p className="text-sm font-medium text-gray-600 mb-2">
+                Plan Overrides (Base/Upgrade):
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {plans.map((p) => {
+                  const planObj = overrideRow.plan_overrides?.[p.id] || { base: "0", upgrade: "0" };
+                  return (
+                    <div key={p.id} className="border p-2 rounded bg-white text-sm">
+                      <div className="font-medium mb-1">{p.name}</div>
+                      <Field className="flex items-center mb-1">
+                        <Label className="w-1/3 text-xs">Base($)</Label>
+                        <Input
+                          type="number"
+                          value={planObj.base}
+                          onChange={(e) =>
+                            setBaseVal(agt.id, p.id, e.target.value, false)
+                          }
+                        />
+                      </Field>
+                      <Field className="flex items-center">
+                        <Label className="w-1/3 text-xs">Upgr($)</Label>
+                        <Input
+                          type="number"
+                          value={planObj.upgrade}
+                          onChange={(e) =>
+                            setBaseVal(agt.id, p.id, e.target.value, true)
+                          }
+                        />
+                      </Field>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="text-sm font-medium text-gray-600 mt-4 mb-2">
+                Date Range Overrides
+              </p>
+              <DateRangeManager
+                plans={plans}
+                dateRanges={overrideRow.date_ranges}
+                setDateRanges={(newRanges) => setAgentDateRanges(agt.id, newRanges)}
+                label="Override Commission Amounts by Date"
+              />
+            </div>
+          );
+        })}
       </DialogBody>
       <DialogActions>
         <Button plain onClick={onClose}>
-          Close
+          Cancel
         </Button>
-        <Button onClick={save}>Save</Button>
+        <Button onClick={handleSave}>Save All</Button>
       </DialogActions>
     </Dialog>
   );
