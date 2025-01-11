@@ -1,3 +1,1958 @@
+here are my supabase tables:
+
+"table_name","column_name","data_type","is_nullable","column_default"
+"agent_managers","id","uuid","NO","gen_random_uuid()"
+"agent_managers","agent_id","uuid","NO",""
+"agent_managers","manager_id","uuid","NO",""
+"agent_managers","created_at","timestamp with time zone","YES","now()"
+"agents","id","uuid","NO","gen_random_uuid()"
+"agents","identifier","text","NO",""
+"agents","name","text","YES",""
+"agents","created_at","timestamp with time zone","YES","now()"
+"agents","is_manager","boolean","YES","false"
+"agents","personal_payscale_id","uuid","YES",""
+"agents","manager_payscale_id","uuid","YES",""
+"agents","fidium_identifier","text","YES",""
+"agents","fidium_personal_payscale_id","uuid","YES",""
+"agents","fidium_manager_payscale_id","uuid","YES",""
+"deductions_reimbursements","id","uuid","NO","gen_random_uuid()"
+"deductions_reimbursements","agent_id","uuid","NO",""
+"deductions_reimbursements","type","text","NO",""
+"deductions_reimbursements","reason","text","YES",""
+"deductions_reimbursements","amount","numeric","NO","0"
+"deductions_reimbursements","is_completed","boolean","NO","false"
+"deductions_reimbursements","created_at","timestamp with time zone","NO","now()"
+"deductions_reimbursements","completed_at","timestamp with time zone","YES",""
+"deductions_reimbursements","report_id","uuid","YES",""
+"deductions_reimbursements","payroll_report_id","uuid","YES",""
+"fidium_manager_agent_commission_date_ranges","id","uuid","NO","gen_random_uuid()"
+"fidium_manager_agent_commission_date_ranges","fidium_manager_agent_commission_id","uuid","NO",""
+"fidium_manager_agent_commission_date_ranges","fidium_plan_id","uuid","NO",""
+"fidium_manager_agent_commission_date_ranges","start_date","date","NO",""
+"fidium_manager_agent_commission_date_ranges","end_date","date","YES",""
+"fidium_manager_agent_commission_date_ranges","manager_commission_value","numeric","NO","0"
+"fidium_manager_agent_commission_date_ranges","created_at","timestamp with time zone","YES","now()"
+"fidium_manager_agent_commissions","id","uuid","NO","gen_random_uuid()"
+"fidium_manager_agent_commissions","manager_id","uuid","NO",""
+"fidium_manager_agent_commissions","agent_id","uuid","NO",""
+"fidium_manager_agent_commissions","fidium_plan_id","uuid","NO",""
+"fidium_manager_agent_commissions","manager_commission_value","numeric","NO","0"
+"fidium_manager_agent_commissions","created_at","timestamp with time zone","YES","now()"
+"fidium_manager_payscale_date_range_plan_commissions","id","uuid","NO","gen_random_uuid()"
+"fidium_manager_payscale_date_range_plan_commissions","fidium_manager_payscale_date_range_id","uuid","NO",""
+"fidium_manager_payscale_date_range_plan_commissions","fidium_plan_id","uuid","NO",""
+"fidium_manager_payscale_date_range_plan_commissions","manager_commission_type","text","NO","'fixed_amount'::text"
+"fidium_manager_payscale_date_range_plan_commissions","manager_commission_value","numeric","NO","0"
+"fidium_manager_payscale_date_range_plan_commissions","created_at","timestamp with time zone","NO","now()"
+"fidium_manager_payscale_date_ranges","id","uuid","NO","gen_random_uuid()"
+"fidium_manager_payscale_date_ranges","fidium_manager_payscale_id","uuid","NO",""
+"fidium_manager_payscale_date_ranges","start_date","date","NO",""
+"fidium_manager_payscale_date_ranges","end_date","date","YES",""
+"fidium_manager_payscale_date_ranges","created_at","timestamp with time zone","NO","now()"
+"fidium_manager_payscale_plan_commissions","id","uuid","NO","gen_random_uuid()"
+"fidium_manager_payscale_plan_commissions","fidium_manager_payscale_id","uuid","NO",""
+"fidium_manager_payscale_plan_commissions","fidium_plan_id","uuid","NO",""
+"fidium_manager_payscale_plan_commissions","manager_commission_type","text","NO",""
+"fidium_manager_payscale_plan_commissions","manager_commission_value","numeric","NO",""
+"fidium_manager_payscale_plan_commissions","created_at","timestamp with time zone","NO","now()"
+"fidium_manager_payscales","id","uuid","NO","gen_random_uuid()"
+"fidium_manager_payscales","name","text","NO",""
+"fidium_manager_payscales","created_at","timestamp with time zone","NO","now()"
+"fidium_personal_payscale_date_range_plan_commissions","id","uuid","NO","gen_random_uuid()"
+"fidium_personal_payscale_date_range_plan_commissions","fidium_personal_payscale_date_range_id","uuid","NO",""
+"fidium_personal_payscale_date_range_plan_commissions","fidium_plan_id","uuid","NO",""
+"fidium_personal_payscale_date_range_plan_commissions","rep_commission_type","text","NO","'fixed_amount'::text"
+"fidium_personal_payscale_date_range_plan_commissions","rep_commission_value","numeric","NO","0"
+"fidium_personal_payscale_date_range_plan_commissions","created_at","timestamp with time zone","NO","now()"
+"fidium_personal_payscale_date_ranges","id","uuid","NO","gen_random_uuid()"
+"fidium_personal_payscale_date_ranges","fidium_personal_payscale_id","uuid","NO",""
+"fidium_personal_payscale_date_ranges","start_date","date","NO",""
+"fidium_personal_payscale_date_ranges","end_date","date","YES",""
+"fidium_personal_payscale_date_ranges","created_at","timestamp with time zone","NO","now()"
+"fidium_personal_payscale_plan_commissions","id","uuid","NO","gen_random_uuid()"
+"fidium_personal_payscale_plan_commissions","fidium_personal_payscale_id","uuid","NO",""
+"fidium_personal_payscale_plan_commissions","fidium_plan_id","uuid","NO",""
+"fidium_personal_payscale_plan_commissions","rep_commission_type","text","NO",""
+"fidium_personal_payscale_plan_commissions","rep_commission_value","numeric","NO",""
+"fidium_personal_payscale_plan_commissions","created_at","timestamp with time zone","NO","now()"
+"fidium_personal_payscales","id","uuid","NO","gen_random_uuid()"
+"fidium_personal_payscales","name","text","NO",""
+"fidium_personal_payscales","upfront_percentage","numeric","NO",""
+"fidium_personal_payscales","backend_percentage","numeric","NO",""
+"fidium_personal_payscales","created_at","timestamp with time zone","NO","now()"
+"fidium_plans","id","uuid","NO","gen_random_uuid()"
+"fidium_plans","name","text","NO",""
+"fidium_plans","commission_amount","numeric","YES",""
+"fidium_plans","created_at","timestamp with time zone","NO","now()"
+"fidium_salesmen","id","bigint","NO",""
+"fidium_salesmen","rep_name","text","NO",""
+"fidium_white_glove_entries","id","bigint","NO","nextval('fidium_white_glove_entries_id_seq'::regclass)"
+"fidium_white_glove_entries","sales_partner","text","YES",""
+"fidium_white_glove_entries","dsi_dealer_type","text","YES",""
+"fidium_white_glove_entries","sale_format","text","YES",""
+"fidium_white_glove_entries","sales_rep","text","YES",""
+"fidium_white_glove_entries","submission_date","date","YES",""
+"fidium_white_glove_entries","customer_name","text","YES",""
+"fidium_white_glove_entries","service_address","text","YES",""
+"fidium_white_glove_entries","city","text","YES",""
+"fidium_white_glove_entries","state","text","YES",""
+"fidium_white_glove_entries","zip","text","YES",""
+"fidium_white_glove_entries","order_type","text","YES",""
+"fidium_white_glove_entries","requested_services","text","YES",""
+"fidium_white_glove_entries","status_change_date","date","YES",""
+"fidium_white_glove_entries","sales_status","text","YES",""
+"fidium_white_glove_entries","install_status","text","YES",""
+"fidium_white_glove_entries","order_number","text","YES",""
+"fidium_white_glove_entries","install_date","date","YES",""
+"fidium_white_glove_entries","amount","numeric","YES",""
+"fidium_white_glove_entries","frontend_paid","boolean","NO","false"
+"fidium_white_glove_entries","backend_paid","boolean","NO","false"
+"fidium_white_glove_entries","created_at","timestamp with time zone","NO","now()"
+"manager_agent_commission_date_ranges","id","uuid","NO","gen_random_uuid()"
+"manager_agent_commission_date_ranges","manager_agent_commission_id","uuid","NO",""
+"manager_agent_commission_date_ranges","plan_id","uuid","NO",""
+"manager_agent_commission_date_ranges","start_date","date","NO",""
+"manager_agent_commission_date_ranges","end_date","date","YES",""
+"manager_agent_commission_date_ranges","manager_commission_value","numeric","NO","0"
+"manager_agent_commission_date_ranges","manager_upgrade_commission_value","numeric","NO","0"
+"manager_agent_commission_date_ranges","created_at","timestamp with time zone","YES","now()"
+"manager_agent_commissions","id","uuid","NO","gen_random_uuid()"
+"manager_agent_commissions","manager_id","uuid","NO",""
+"manager_agent_commissions","agent_id","uuid","NO",""
+"manager_agent_commissions","plan_id","uuid","NO",""
+"manager_agent_commissions","manager_commission_value","numeric","NO","0"
+"manager_agent_commissions","manager_upgrade_commission_value","numeric","NO","0"
+"manager_agent_commissions","created_at","timestamp with time zone","YES","now()"
+"manager_payscale_date_range_plan_commissions","id","uuid","NO","gen_random_uuid()"
+"manager_payscale_date_range_plan_commissions","manager_payscale_date_range_id","uuid","NO",""
+"manager_payscale_date_range_plan_commissions","plan_id","uuid","NO",""
+"manager_payscale_date_range_plan_commissions","manager_commission_type","text","NO","'fixed_amount'::text"
+"manager_payscale_date_range_plan_commissions","manager_commission_value","numeric","NO","0"
+"manager_payscale_date_range_plan_commissions","manager_upgrade_commission_type","text","NO","'fixed_amount'::text"
+"manager_payscale_date_range_plan_commissions","manager_upgrade_commission_value","numeric","NO","0"
+"manager_payscale_date_range_plan_commissions","created_at","timestamp with time zone","NO","now()"
+"manager_payscale_date_ranges","id","uuid","NO","gen_random_uuid()"
+"manager_payscale_date_ranges","manager_payscale_id","uuid","NO",""
+"manager_payscale_date_ranges","start_date","date","NO",""
+"manager_payscale_date_ranges","end_date","date","YES",""
+"manager_payscale_date_ranges","created_at","timestamp with time zone","NO","now()"
+"manager_payscale_plan_commissions","id","uuid","NO","gen_random_uuid()"
+"manager_payscale_plan_commissions","manager_payscale_id","uuid","NO",""
+"manager_payscale_plan_commissions","plan_id","uuid","NO",""
+"manager_payscale_plan_commissions","manager_commission_type","text","NO",""
+"manager_payscale_plan_commissions","manager_commission_value","numeric","NO",""
+"manager_payscale_plan_commissions","created_at","timestamp with time zone","NO","now()"
+"manager_payscale_plan_commissions","manager_upgrade_commission_type","text","NO","'fixed_amount'::text"
+"manager_payscale_plan_commissions","manager_upgrade_commission_value","numeric","NO","0"
+"manager_payscales","id","uuid","NO","gen_random_uuid()"
+"manager_payscales","name","text","NO",""
+"manager_payscales","created_at","timestamp with time zone","NO","now()"
+"payroll_report_batches","id","uuid","NO","gen_random_uuid()"
+"payroll_report_batches","batch_name","text","NO",""
+"payroll_report_batches","created_at","timestamp with time zone","YES","now()"
+"payroll_reports","id","uuid","NO","gen_random_uuid()"
+"payroll_reports","created_at","timestamp with time zone","YES","now()"
+"payroll_reports","agent_id","uuid","YES",""
+"payroll_reports","name","text","YES",""
+"payroll_reports","accounts","integer","YES",""
+"payroll_reports","personal_total","numeric","YES",""
+"payroll_reports","manager_total","numeric","YES",""
+"payroll_reports","grand_total","numeric","YES",""
+"payroll_reports","upfront_percentage","numeric","YES",""
+"payroll_reports","backend_percentage","numeric","YES",""
+"payroll_reports","upfront_value","numeric","YES",""
+"payroll_reports","backend_value","numeric","YES",""
+"payroll_reports","frontend_is_paid","boolean","YES","false"
+"payroll_reports","batch_id","uuid","YES",""
+"payroll_reports","backend_is_paid","boolean","YES","false"
+"payroll_reports","details","jsonb","YES",""
+"payroll_reports","report_type","text","YES",""
+"personal_payscale_date_range_plan_commissions","id","uuid","NO","gen_random_uuid()"
+"personal_payscale_date_range_plan_commissions","personal_payscale_date_range_id","uuid","NO",""
+"personal_payscale_date_range_plan_commissions","plan_id","uuid","NO",""
+"personal_payscale_date_range_plan_commissions","rep_commission_type","text","NO","'fixed_amount'::text"
+"personal_payscale_date_range_plan_commissions","rep_commission_value","numeric","NO","0"
+"personal_payscale_date_range_plan_commissions","rep_upgrade_commission_type","text","NO","'fixed_amount'::text"
+"personal_payscale_date_range_plan_commissions","rep_upgrade_commission_value","numeric","NO","0"
+"personal_payscale_date_range_plan_commissions","created_at","timestamp with time zone","NO","now()"
+"personal_payscale_date_ranges","id","uuid","NO","gen_random_uuid()"
+"personal_payscale_date_ranges","personal_payscale_id","uuid","NO",""
+"personal_payscale_date_ranges","start_date","date","NO",""
+"personal_payscale_date_ranges","end_date","date","YES",""
+"personal_payscale_date_ranges","created_at","timestamp with time zone","NO","now()"
+"personal_payscale_plan_commissions","id","uuid","NO","gen_random_uuid()"
+"personal_payscale_plan_commissions","personal_payscale_id","uuid","NO",""
+"personal_payscale_plan_commissions","plan_id","uuid","NO",""
+"personal_payscale_plan_commissions","rep_commission_type","text","NO",""
+"personal_payscale_plan_commissions","rep_commission_value","numeric","NO",""
+"personal_payscale_plan_commissions","created_at","timestamp with time zone","NO","now()"
+"personal_payscale_plan_commissions","rep_upgrade_commission_type","text","NO","'fixed_amount'::text"
+"personal_payscale_plan_commissions","rep_upgrade_commission_value","numeric","NO","0"
+"personal_payscales","id","uuid","NO","gen_random_uuid()"
+"personal_payscales","name","text","NO",""
+"personal_payscales","upfront_percentage","numeric","NO",""
+"personal_payscales","backend_percentage","numeric","NO",""
+"personal_payscales","created_at","timestamp with time zone","NO","now()"
+"plans","id","uuid","NO","gen_random_uuid()"
+"plans","name","text","NO",""
+"plans","commission_amount","numeric","YES",""
+"plans","created_at","timestamp with time zone","YES","now()"
+"profiles","id","uuid","NO",""
+"profiles","name","text","YES",""
+"profiles","email","text","YES",""
+"profiles","is_manager","boolean","YES","false"
+"profiles","personal_payscale_id","uuid","YES",""
+"profiles","manager_payscale_id","uuid","YES",""
+"profiles","created_at","timestamp with time zone","YES","now()"
+"user_managers","user_id","uuid","NO",""
+"user_managers","manager_id","uuid","NO",""
+"user_managers","created_at","timestamp with time zone","YES","now()"
+"white_glove_entries","id","bigint","NO","nextval('white_glove_entries_id_seq'::regclass)"
+"white_glove_entries","customer_name","text","YES",""
+"white_glove_entries","customer_street_address","text","YES",""
+"white_glove_entries","customer_city","text","YES",""
+"white_glove_entries","customer_state","text","YES",""
+"white_glove_entries","ban","text","YES",""
+"white_glove_entries","order_number","text","YES",""
+"white_glove_entries","order_status","text","YES",""
+"white_glove_entries","order_submission_date","date","YES",""
+"white_glove_entries","original_due_date","date","YES",""
+"white_glove_entries","updated_due_date","date","YES",""
+"white_glove_entries","order_completed_cancelled","text","YES",""
+"white_glove_entries","customer_cbr","text","YES",""
+"white_glove_entries","partner_name","text","YES",""
+"white_glove_entries","partner_sales_code","text","YES",""
+"white_glove_entries","audit_status","text","YES",""
+"white_glove_entries","audit_closed","text","YES",""
+"white_glove_entries","who_cancelled_the_order","text","YES",""
+"white_glove_entries","did_you_intervene_on_the_order","text","YES",""
+"white_glove_entries","notes","text","YES",""
+"white_glove_entries","item_type","text","YES",""
+"white_glove_entries","path","text","YES",""
+"white_glove_entries","due_date_helper","text","YES",""
+"white_glove_entries","migrating_from_legacy","text","YES",""
+"white_glove_entries","legacy_or_brspd_fiber","text","YES",""
+"white_glove_entries","cancellation_reason","text","YES",""
+"white_glove_entries","voice_qty","integer","YES",""
+"white_glove_entries","hsi_qty","integer","YES",""
+"white_glove_entries","internet_speed","text","YES",""
+"white_glove_entries","agent_seller_information","text","YES",""
+"white_glove_entries","modified_due_date","date","YES",""
+"white_glove_entries","modified_month","integer","YES",""
+"white_glove_entries","month_issued","integer","YES",""
+"white_glove_entries","year_issued","integer","YES",""
+"white_glove_entries","month_completed","integer","YES",""
+"white_glove_entries","year_completed","integer","YES",""
+"white_glove_entries","month_due","integer","YES",""
+"white_glove_entries","year_due","integer","YES",""
+"white_glove_entries","created_at","timestamp with time zone","YES","now()"
+"white_glove_entries","updated_at","timestamp with time zone","YES","now()"
+"white_glove_entries","frontend_paid","boolean","YES","false"
+"white_glove_entries","backend_paid","boolean","YES","false"
+"white_glove_entries","install_date","date","YES",""
+"white_glove_entries","batch_id","uuid","YES",""
+"white_glove_entries","agent_id","uuid","YES",""
+
+here is my nextjs15 project:
+
+// app/protected/backend/page.jsx
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { Button } from "@/components/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/table";
+import { Checkbox } from "@/components/checkbox";
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownItem,
+  DropdownMenu,
+  DropdownDivider,
+} from "@/components/dropdown";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  EllipsisVerticalIcon,
+} from "@heroicons/react/20/solid";
+
+function isOverdue(install_date) {
+  if (!install_date) return false;
+  const now = new Date();
+  return (now - new Date(install_date)) / (1000 * 60 * 60 * 24) > 90;
+}
+
+function getOverdueDays(install_date) {
+  const now = new Date();
+  return Math.floor((now - new Date(install_date)) / (1000 * 60 * 60 * 24));
+}
+
+async function computeBatchOverdueCountsBackend(supabase, batches) {
+  const newOverdueCounts = {};
+  for (const batch of batches) {
+    const { data: linesData } = await supabase
+      .from("payroll_reports")
+      .select("details,report_type,backend_is_paid")
+      .eq("batch_id", batch.id);
+
+    if (!linesData || linesData.length === 0) {
+      newOverdueCounts[batch.id] = 0;
+      continue;
+    }
+
+    const allWgeIds = [];
+    const allFwgIds = [];
+    linesData.forEach((line) => {
+      if (Array.isArray(line.details)) {
+        for (const d of line.details) {
+          if (d.white_glove_entry_id) allWgeIds.push(d.white_glove_entry_id);
+          if (d.fidium_white_glove_id) allFwgIds.push(d.fidium_white_glove_id);
+        }
+      }
+    });
+
+    let overdueCount = 0;
+    if (allWgeIds.length > 0) {
+      const { data: wgeData } = await supabase
+        .from("white_glove_entries")
+        .select("install_date,backend_paid")
+        .in("id", allWgeIds);
+      (wgeData || []).forEach((w) => {
+        if (!w.backend_paid && isOverdue(w.install_date)) overdueCount++;
+      });
+    }
+    if (allFwgIds.length > 0) {
+      const { data: fwgData } = await supabase
+        .from("fidium_white_glove_entries")
+        .select("install_date,backend_paid")
+        .in("id", allFwgIds);
+      (fwgData || []).forEach((f) => {
+        if (!f.backend_paid && isOverdue(f.install_date)) overdueCount++;
+      });
+    }
+
+    newOverdueCounts[batch.id] = overdueCount;
+  }
+  return newOverdueCounts;
+}
+
+export default function BackendReportsPage() {
+  const supabase = useMemo(() => createClient(), []);
+  const [batches, setBatches] = useState([]);
+  const [batchOverdueCounts, setBatchOverdueCounts] = useState({});
+  const [batchPaidMap, setBatchPaidMap] = useState({});
+  const [selectedBatchId, setSelectedBatchId] = useState(null);
+  const [reportLines, setReportLines] = useState([]);
+  const [expandedAgents, setExpandedAgents] = useState(new Set());
+  const [wgeMap, setWgeMap] = useState({});
+  const [fwgMap, setFwgMap] = useState({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchBatches();
+  }, []);
+
+  async function fetchBatches() {
+    setLoading(true);
+    const { data: batchData } = await supabase
+      .from("payroll_report_batches")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (!batchData) {
+      setLoading(false);
+      return;
+    }
+    const overdueCounts = await computeBatchOverdueCountsBackend(
+      supabase,
+      batchData
+    );
+    const newBatchPaidMap = {};
+    for (const batch of batchData) {
+      const { data: reportsData } = await supabase
+        .from("payroll_reports")
+        .select("backend_is_paid")
+        .eq("batch_id", batch.id);
+      if (reportsData && reportsData.length > 0) {
+        const total = reportsData.length;
+        const paidCount = reportsData.filter((r) => r.backend_is_paid).length;
+        const pct = ((paidCount / total) * 100).toFixed(2);
+        newBatchPaidMap[batch.id] = { paidPercentage: parseFloat(pct) };
+      } else {
+        newBatchPaidMap[batch.id] = { paidPercentage: 0 };
+      }
+    }
+    setBatches(batchData);
+    setBatchOverdueCounts(overdueCounts);
+    setBatchPaidMap(newBatchPaidMap);
+    setLoading(false);
+  }
+
+  async function loadBatchDetails(batch_id) {
+    setLoading(true);
+    const { data: linesData } = await supabase
+      .from("payroll_reports")
+      .select("*")
+      .eq("batch_id", batch_id);
+    if (!linesData) {
+      setLoading(false);
+      return;
+    }
+    linesData.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+    const allWgeIds = [];
+    const allFwgIds = [];
+    for (const line of linesData) {
+      if (Array.isArray(line.details)) {
+        for (const d of line.details) {
+          if (d.white_glove_entry_id) allWgeIds.push(d.white_glove_entry_id);
+          if (d.fidium_white_glove_id) allFwgIds.push(d.fidium_white_glove_id);
+        }
+      }
+    }
+
+    let wgeById = {};
+    if (allWgeIds.length > 0) {
+      const { data: wgeData } = await supabase
+        .from("white_glove_entries")
+        .select("*")
+        .in("id", allWgeIds);
+      (wgeData || []).forEach((w) => {
+        wgeById[w.id] = w;
+      });
+    }
+
+    let fwgById = {};
+    if (allFwgIds.length > 0) {
+      const { data: fwgData } = await supabase
+        .from("fidium_white_glove_entries")
+        .select("*")
+        .in("id", allFwgIds);
+      (fwgData || []).forEach((f) => {
+        fwgById[f.id] = f;
+      });
+    }
+
+    // Auto-check if line is fully paid
+    for (const line of linesData) {
+      const lineAccs = Array.isArray(line.details) ? line.details : [];
+      const allPaid =
+        lineAccs.length > 0 &&
+        lineAccs.every((acc) => {
+          if (acc.white_glove_entry_id)
+            return wgeById[acc.white_glove_entry_id]?.backend_paid;
+          if (acc.fidium_white_glove_id)
+            return fwgById[acc.fidium_white_glove_id]?.backend_paid;
+          return true;
+        });
+      if (allPaid && !line.backend_is_paid) {
+        line.backend_is_paid = true;
+        supabase
+          .from("payroll_reports")
+          .update({ backend_is_paid: true })
+          .eq("id", line.id);
+      }
+    }
+
+    setReportLines(linesData);
+    setWgeMap(wgeById);
+    setFwgMap(fwgById);
+    setLoading(false);
+  }
+
+  function enterBatch(batch_id) {
+    setSelectedBatchId(batch_id);
+    loadBatchDetails(batch_id);
+  }
+
+  async function goBack() {
+    setSelectedBatchId(null);
+    setReportLines([]);
+    setWgeMap({});
+    setFwgMap({});
+    await fetchBatches();
+  }
+
+  function toggleAgentExpand(line) {
+    setExpandedAgents((prev) => {
+      const newSet = new Set(prev);
+      newSet.has(line.id) ? newSet.delete(line.id) : newSet.add(line.id);
+      return newSet;
+    });
+  }
+
+  async function togglePaid(line) {
+    const newPaidValue = !line.backend_is_paid;
+    const { data: updatedLineData } = await supabase
+      .from("payroll_reports")
+      .update({ backend_is_paid: newPaidValue })
+      .eq("id", line.id)
+      .select("*");
+    if (!updatedLineData) return;
+
+    const updatedLine = updatedLineData[0];
+    const lineAccs = Array.isArray(updatedLine.details)
+      ? updatedLine.details
+      : [];
+    const wIds = lineAccs
+      .filter((d) => d.white_glove_entry_id)
+      .map((d) => d.white_glove_entry_id);
+    const fIds = lineAccs
+      .filter((d) => d.fidium_white_glove_id)
+      .map((d) => d.fidium_white_glove_id);
+
+    if (wIds.length > 0) {
+      await supabase
+        .from("white_glove_entries")
+        .update({ backend_paid: newPaidValue })
+        .in("id", wIds);
+      const newMap = { ...wgeMap };
+      wIds.forEach((id) => {
+        if (newMap[id]) newMap[id].backend_paid = newPaidValue;
+      });
+      setWgeMap(newMap);
+    }
+    if (fIds.length > 0) {
+      await supabase
+        .from("fidium_white_glove_entries")
+        .update({ backend_paid: newPaidValue })
+        .in("id", fIds);
+      const newMap = { ...fwgMap };
+      fIds.forEach((id) => {
+        if (newMap[id]) newMap[id].backend_paid = newPaidValue;
+      });
+      setFwgMap(newMap);
+    }
+
+    setReportLines((prev) =>
+      prev.map((r) => (r.id === line.id ? updatedLine : r))
+    );
+    if (newPaidValue) {
+      setExpandedAgents((prev) => new Set([...prev, updatedLine.id]));
+    }
+  }
+
+  async function toggleAccountPaid(line, type, entryId) {
+    const newPaidValue =
+      type === "white"
+        ? !wgeMap[entryId]?.backend_paid
+        : !fwgMap[entryId]?.backend_paid;
+
+    if (type === "white") {
+      await supabase
+        .from("white_glove_entries")
+        .update({ backend_paid: newPaidValue })
+        .eq("id", entryId);
+      setWgeMap((prev) => ({
+        ...prev,
+        [entryId]: { ...prev[entryId], backend_paid: newPaidValue },
+      }));
+    } else {
+      await supabase
+        .from("fidium_white_glove_entries")
+        .update({ backend_paid: newPaidValue })
+        .eq("id", entryId);
+      setFwgMap((prev) => ({
+        ...prev,
+        [entryId]: { ...prev[entryId], backend_paid: newPaidValue },
+      }));
+    }
+
+    const lineAccs = Array.isArray(line.details) ? line.details : [];
+    const allPaid = lineAccs.every((acc) => {
+      if (acc.white_glove_entry_id) {
+        return (
+          wgeMap[acc.white_glove_entry_id]?.backend_paid === true ||
+          (acc.white_glove_entry_id === entryId && newPaidValue)
+        );
+      }
+      if (acc.fidium_white_glove_id) {
+        return (
+          fwgMap[acc.fidium_white_glove_id]?.backend_paid === true ||
+          (acc.fidium_white_glove_id === entryId && newPaidValue)
+        );
+      }
+      return true;
+    });
+    if (allPaid && !line.backend_is_paid) {
+      await supabase
+        .from("payroll_reports")
+        .update({ backend_is_paid: true })
+        .eq("id", line.id);
+      setReportLines((prev) =>
+        prev.map((r) => (r.id === line.id ? { ...r, backend_is_paid: true } : r))
+      );
+    } else if (!allPaid && line.backend_is_paid) {
+      await supabase
+        .from("payroll_reports")
+        .update({ backend_is_paid: false })
+        .eq("id", line.id);
+      setReportLines((prev) =>
+        prev.map((r) => (r.id === line.id ? { ...r, backend_is_paid: false } : r))
+      );
+    }
+  }
+
+  function getPaidPercentage() {
+    if (reportLines.length === 0) return "0";
+    const paidCount = reportLines.filter((r) => r.backend_is_paid).length;
+    return ((paidCount / reportLines.length) * 100).toFixed(2);
+  }
+
+  function lineHasOverdue(line) {
+    const accs = Array.isArray(line.details) ? line.details : [];
+    return accs.some((d) => {
+      if (d.white_glove_entry_id) {
+        const w = wgeMap[d.white_glove_entry_id];
+        return w && !w.backend_paid && isOverdue(w.install_date);
+      }
+      if (d.fidium_white_glove_id) {
+        const f = fwgMap[d.fidium_white_glove_id];
+        return f && !f.backend_paid && isOverdue(f.install_date);
+      }
+      return false;
+    });
+  }
+
+  function getMaxOverdueDaysForLine(line) {
+    let maxDays = 0;
+    const accs = Array.isArray(line.details) ? line.details : [];
+    for (const d of accs) {
+      if (d.white_glove_entry_id) {
+        const w = wgeMap[d.white_glove_entry_id];
+        if (w && !w.backend_paid) {
+          const days = getOverdueDays(w.install_date);
+          if (days > maxDays) maxDays = days;
+        }
+      } else if (d.fidium_white_glove_id) {
+        const f = fwgMap[d.fidium_white_glove_id];
+        if (f && !f.backend_paid) {
+          const days = getOverdueDays(f.install_date);
+          if (days > maxDays) maxDays = days;
+        }
+      }
+    }
+    return maxDays;
+  }
+
+  async function renameBatch(batch) {
+    const newName = window.prompt("New batch name?", batch.batch_name);
+    if (newName && newName.trim()) {
+      await supabase
+        .from("payroll_report_batches")
+        .update({ batch_name: newName.trim() })
+        .eq("id", batch.id);
+      fetchBatches();
+    }
+  }
+
+  async function deleteBatch(batch) {
+    if (confirm(`Delete batch ${batch.batch_name}?`)) {
+      await supabase.from("payroll_reports").delete().eq("batch_id", batch.id);
+      await supabase.from("payroll_report_batches").delete().eq("id", batch.id);
+      fetchBatches();
+    }
+  }
+
+  if (!selectedBatchId) {
+    return (
+      <div className="p-6 space-y-6 font-sans text-gray-900">
+        <h2 className="text-2xl font-bold text-center">
+          Saved Payroll Batches (Backend)
+        </h2>
+        {loading && <div>Loading...</div>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {batches.map((b) => {
+            const overdueCount = batchOverdueCounts[b.id] || 0;
+            const paidInfo = batchPaidMap[b.id] || { paidPercentage: 0 };
+            const pct = paidInfo.paidPercentage;
+            return (
+              <div
+                key={b.id}
+                className="border rounded flex flex-col items-center cursor-pointer relative"
+                onClick={() => enterBatch(b.id)}
+                style={{
+                  background: `linear-gradient(to right, #22c55e ${pct}%, #e5e7eb ${pct}%)`,
+                }}
+              >
+                <div className="absolute top-2 left-2 bg-white bg-opacity-90 text-gray-800 text-sm font-bold px-2 py-1 rounded">
+                  {pct}% Paid Out
+                </div>
+                {overdueCount > 0 && (
+                  <span className="absolute top-2 right-12 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {overdueCount}
+                  </span>
+                )}
+                <div
+                  className="absolute top-2 right-2 z-10"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Dropdown>
+                    <DropdownButton
+                      as="div"
+                      className="cursor-pointer flex items-center"
+                    >
+                      <EllipsisVerticalIcon className="h-5 w-5 text-gray-500" />
+                    </DropdownButton>
+                    <DropdownMenu className="min-w-32" anchor="bottom end">
+                      <DropdownItem onClick={() => renameBatch(b)}>
+                        Rename
+                      </DropdownItem>
+                      <DropdownDivider />
+                      <DropdownItem onClick={() => deleteBatch(b)}>
+                        Delete
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
+                </div>
+                <div
+                  className="w-full py-6 flex flex-col items-center"
+                  style={{ pointerEvents: "none" }}
+                >
+                  <span className="text-lg font-semibold">
+                    {b.batch_name}
+                  </span>
+                  <div className="text-sm text-gray-700">
+                    Created: {new Date(b.created_at).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  const paidPct = parseFloat(getPaidPercentage());
+
+  return (
+    <div className="p-6 space-y-6">
+      <Button onClick={goBack}>Back to Batches</Button>
+      <h3 className="text-lg font-bold mt-4">Batch Details (Backend)</h3>
+      <div className="flex items-center space-x-4 mb-4">
+        <div>Total lines: {reportLines.length}</div>
+        <div>{getPaidPercentage()}% paid out</div>
+      </div>
+      <div className="w-full bg-gray-200 h-2 rounded">
+        <div
+          className="bg-green-500 h-2 rounded"
+          style={{ width: `${paidPct}%` }}
+        />
+      </div>
+      {loading && <div>Loading...</div>}
+      <Table striped>
+        <TableHead>
+          <TableRow>
+            <TableHeader />
+            <TableHeader>Paid?</TableHeader>
+            <TableHeader>Name</TableHeader>
+            <TableHeader># Accounts</TableHeader>
+            <TableHeader>Personal Total</TableHeader>
+            <TableHeader>Backend</TableHeader>
+            <TableHeader>Status</TableHeader>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {reportLines.map((line) => {
+            const isExpanded = expandedAgents.has(line.id);
+            const personalTotalDisplay =
+              typeof line.personal_total === "number"
+                ? `$${line.personal_total.toFixed(2)}`
+                : "N/A";
+            const backendVal = line.backend_value || 0;
+            const backendPerc = line.backend_percentage;
+            const backendDisplay =
+              backendPerc !== null && !isNaN(backendPerc)
+                ? `$${backendVal.toFixed(2)} (${backendPerc}%)`
+                : "N/A";
+            const overdueLine = lineHasOverdue(line);
+            let maxDays = overdueLine ? getMaxOverdueDaysForLine(line) : 0;
+            if (overdueLine) maxDays = maxDays - 90;
+            const lineStatus =
+              overdueLine && !line.backend_is_paid
+                ? `Overdue (${maxDays} days)`
+                : line.backend_is_paid
+                ? "Paid"
+                : "Unpaid";
+            const rowClass = line.backend_is_paid
+              ? "bg-green-100"
+              : overdueLine
+              ? "bg-red-100"
+              : "";
+
+            return (
+              <React.Fragment key={line.id}>
+                <TableRow className={rowClass}>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="plain"
+                      onClick={() => toggleAgentExpand(line)}
+                    >
+                      {isExpanded ? (
+                        <ChevronUpIcon className="h-5 w-5" />
+                      ) : (
+                        <ChevronDownIcon className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </TableCell>
+                  <TableCell>
+                    <Checkbox
+                      checked={line.backend_is_paid}
+                      onChange={() => togglePaid(line)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {overdueLine ? (
+                      <span className="text-red-700 font-bold">
+                        {line.name}
+                      </span>
+                    ) : (
+                      line.name
+                    )}
+                  </TableCell>
+                  <TableCell>{line.accounts}</TableCell>
+                  <TableCell>{personalTotalDisplay}</TableCell>
+                  <TableCell>{backendDisplay}</TableCell>
+                  <TableCell>{lineStatus}</TableCell>
+                </TableRow>
+                {isExpanded && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="bg-gray-50">
+                      <div className="p-4">
+                        <h4 className="font-bold mb-2">
+                          Sales Details (Backend)
+                        </h4>
+                        <Table striped>
+                          <TableHead>
+                            <TableRow>
+                              <TableHeader />
+                              <TableHeader>Order #</TableHeader>
+                              <TableHeader>Customer Name</TableHeader>
+                              <TableHeader>Address</TableHeader>
+                              <TableHeader>Plan</TableHeader>
+                              <TableHeader>Install Date</TableHeader>
+                              <TableHeader>Personal Comm</TableHeader>
+                              <TableHeader>Status</TableHeader>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {(line.details || []).map((acc, idx) => {
+                              if (acc.white_glove_entry_id) {
+                                const w = wgeMap[acc.white_glove_entry_id];
+                                if (!w) return null;
+                                const personalComm = `$${(
+                                  acc.personal_commission || 0
+                                ).toFixed(2)}`;
+                                const installDate = w.install_date
+                                  ? new Date(w.install_date).toLocaleDateString()
+                                  : "N/A";
+                                const isPaid = w.backend_paid;
+                                let status = "Unpaid";
+                                if (isPaid) {
+                                  status = "Paid";
+                                } else if (isOverdue(w.install_date)) {
+                                  status = `Overdue (${
+                                    getOverdueDays(w.install_date) - 90
+                                  } days)`;
+                                }
+                                return (
+                                  <TableRow
+                                    key={idx}
+                                    className={
+                                      isPaid
+                                        ? "bg-green-50"
+                                        : status.startsWith("Overdue")
+                                        ? "bg-red-50"
+                                        : ""
+                                    }
+                                  >
+                                    <TableCell>
+                                      <Checkbox
+                                        checked={isPaid}
+                                        onChange={() =>
+                                          toggleAccountPaid(
+                                            line,
+                                            "white",
+                                            w.id
+                                          )
+                                        }
+                                      />
+                                    </TableCell>
+                                    <TableCell>{w.order_number}</TableCell>
+                                    <TableCell>{w.customer_name}</TableCell>
+                                    <TableCell>
+                                      {(w.customer_street_address || "") +
+                                        " " +
+                                        (w.customer_city || "") +
+                                        " " +
+                                        (w.customer_state || "")}
+                                    </TableCell>
+                                    <TableCell>
+                                      {w.internet_speed || "N/A"}
+                                    </TableCell>
+                                    <TableCell>{installDate}</TableCell>
+                                    <TableCell>{personalComm}</TableCell>
+                                    <TableCell>{status}</TableCell>
+                                  </TableRow>
+                                );
+                              } else if (acc.fidium_white_glove_id) {
+                                const f = fwgMap[acc.fidium_white_glove_id];
+                                if (!f) return null;
+                                const personalComm = `$${(
+                                  acc.personal_commission || 0
+                                ).toFixed(2)}`;
+                                const installDate = f.install_date
+                                  ? new Date(f.install_date).toLocaleDateString()
+                                  : "N/A";
+                                const isPaid = f.backend_paid;
+                                let status = "Unpaid";
+                                if (isPaid) {
+                                  status = "Paid";
+                                } else if (isOverdue(f.install_date)) {
+                                  status = `Overdue (${
+                                    getOverdueDays(f.install_date) - 90
+                                  } days)`;
+                                }
+                                return (
+                                  <TableRow
+                                    key={idx}
+                                    className={
+                                      isPaid
+                                        ? "bg-green-50"
+                                        : status.startsWith("Overdue")
+                                        ? "bg-red-50"
+                                        : ""
+                                    }
+                                  >
+                                    <TableCell>
+                                      <Checkbox
+                                        checked={isPaid}
+                                        onChange={() =>
+                                          toggleAccountPaid(
+                                            line,
+                                            "fidium",
+                                            f.id
+                                          )
+                                        }
+                                      />
+                                    </TableCell>
+                                    <TableCell>{f.order_number}</TableCell>
+                                    <TableCell>{f.customer_name}</TableCell>
+                                    <TableCell>
+                                      {f.service_address}
+                                    </TableCell>
+                                    <TableCell>
+                                      {f.requested_services || "N/A"}
+                                    </TableCell>
+                                    <TableCell>{installDate}</TableCell>
+                                    <TableCell>{personalComm}</TableCell>
+                                    <TableCell>{status}</TableCell>
+                                  </TableRow>
+                                );
+                              } else {
+                                return null;
+                              }
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+
+
+// app/protected/dashboard/page.jsx
+'use client';
+
+import { useEffect, useState, useMemo } from 'react';
+import { createClient } from '@/utils/supabase/client';
+import { Button } from '@/components/button';
+
+export default function DashboardPage() {
+  const supabase = useMemo(() => createClient(), []);
+  const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState({ monthly: 0, yearly: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+      if (!session) {
+        // No session, redirect or show message
+        setLoading(false);
+        return;
+      }
+      const userId = session.user.id;
+
+      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (!profileData) {
+        setLoading(false);
+        return;
+      }
+      setProfile(profileData);
+
+      // Example: Fetch current month's and year's total personal commissions
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+
+      // monthly personal totals from payroll_reports for this user
+      const { data: monthlyData } = await supabase
+        .from('payroll_reports')
+        .select('personal_total')
+        .eq('agent_id', userId)
+        .gte('created_at', `${year}-${month}-01`)
+        .lt('created_at', `${year}-${month + 1}-01`); // simplistic monthly range
+
+      // yearly personal totals
+      const { data: yearlyData } = await supabase
+        .from('payroll_reports')
+        .select('personal_total')
+        .eq('agent_id', userId)
+        .gte('created_at', `${year}-01-01`)
+        .lt('created_at', `${year + 1}-01-01`);
+
+      const monthlySum = (monthlyData || []).reduce((sum, r) => sum + (r.personal_total || 0), 0);
+      const yearlySum = (yearlyData || []).reduce((sum, r) => sum + (r.personal_total || 0), 0);
+
+      setStats({ monthly: monthlySum, yearly: yearlySum });
+      setLoading(false);
+    })();
+  }, [supabase]);
+
+  if (loading) return <div className="p-6 text-gray-900">Loading...</div>;
+  if (!profile) return <div className="p-6 text-gray-900">Please log in to view your dashboard.</div>;
+
+  return (
+    <div className="p-6 space-y-6 font-sans text-gray-900">
+      <h2 className="text-2xl font-bold">Welcome, {profile.name}!</h2>
+      <div className="space-y-4">
+        <div>This month's personal commission: ${stats.monthly.toFixed(2)}</div>
+        <div>This year's personal commission: ${stats.yearly.toFixed(2)}</div>
+      </div>
+      <Button onClick={async () => { await supabase.auth.signOut(); window.location.reload(); }}>Sign Out</Button>
+    </div>
+  );
+}
+
+
+
+// app/protected/deductions/page.jsx
+"use client";
+import React, { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
+import "tailwindcss/tailwind.css";
+import { Button } from "@/components/button";
+import {
+  Dialog,
+  DialogTitle,
+  DialogBody,
+  DialogActions,
+} from "@/components/dialog";
+import {
+  Table,
+  TableHead,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@/components/table";
+import { Field, Label } from "@/components/fieldset";
+import { Select } from "@/components/select";
+import { Input } from "@/components/input";
+
+export default function DeductionsReimbursementsPage() {
+  const supabase = useMemo(() => createClient(), []);
+  const [agents, setAgents] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [deductions, setDeductions] = useState([]);
+
+  // Main Add/Edit modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [deductionData, setDeductionData] = useState({
+    id: "",
+    agent_id: "",
+    type: "deduction",
+    reason: "",
+    amount: "",
+  });
+
+  // "Mark Done" modal
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [completeDed, setCompleteDed] = useState(null);
+  const [completeReportId, setCompleteReportId] = useState("");
+
+  useEffect(() => {
+    fetchAgents();
+    fetchReports();
+    fetchDeductions();
+  }, []);
+
+  async function fetchAgents() {
+    const { data } = await supabase.from("agents").select("*");
+    setAgents(data || []);
+  }
+
+  async function fetchReports() {
+    // We fetch payroll_reports plus the joined batch_name from payroll_report_batches
+    const { data } = await supabase
+      .from("payroll_reports")
+      .select("id, name, batch_id, payroll_report_batches(batch_name)")
+      .order("created_at", { ascending: false });
+    setReports(data || []);
+  }
+
+  async function fetchDeductions() {
+    const { data } = await supabase
+      .from("deductions_reimbursements")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setDeductions(data || []);
+  }
+
+  function openAddModal() {
+    setIsEditing(false);
+    setDeductionData({
+      id: "",
+      agent_id: "",
+      type: "deduction",
+      reason: "",
+      amount: "",
+    });
+    setIsModalOpen(true);
+  }
+
+  function openEditModal(ded) {
+    setIsEditing(true);
+    setDeductionData({
+      id: ded.id,
+      agent_id: ded.agent_id,
+      type: ded.type,
+      reason: ded.reason || "",
+      amount: ded.amount.toString() || "",
+    });
+    setIsModalOpen(true);
+  }
+
+  async function saveDeduction() {
+    const payload = {
+      agent_id: deductionData.agent_id,
+      type: deductionData.type,
+      reason: deductionData.reason || "",
+      amount: parseFloat(deductionData.amount) || 0,
+    };
+
+    if (isEditing && deductionData.id) {
+      // Update existing
+      await supabase
+        .from("deductions_reimbursements")
+        .update(payload)
+        .eq("id", deductionData.id);
+    } else {
+      // Insert new
+      await supabase.from("deductions_reimbursements").insert([payload]);
+    }
+
+    setIsModalOpen(false);
+    await fetchDeductions();
+  }
+
+  // Mark done or re-open
+  function handleMarkDone(ded) {
+    if (ded.is_completed) {
+      // It's completed => re-open
+      reopenDeduction(ded);
+    } else {
+      // It's open => ask them to pick a report
+      setCompleteDed(ded);
+      setCompleteReportId(ded.payroll_report_id || "");
+      setIsCompleteModalOpen(true);
+    }
+  }
+
+  async function reopenDeduction(ded) {
+    await supabase
+      .from("deductions_reimbursements")
+      .update({
+        is_completed: false,
+        completed_at: null,
+        payroll_report_id: null,
+      })
+      .eq("id", ded.id);
+    fetchDeductions();
+  }
+
+  // user chooses which report => set is_completed = true
+  async function completeDeduction() {
+    if (!completeDed) return;
+    await supabase
+      .from("deductions_reimbursements")
+      .update({
+        is_completed: true,
+        completed_at: new Date().toISOString(),
+        payroll_report_id: completeReportId || null,
+      })
+      .eq("id", completeDed.id);
+
+    setIsCompleteModalOpen(false);
+    setCompleteDed(null);
+    setCompleteReportId("");
+    fetchDeductions();
+  }
+
+  // Delete an entry
+  async function handleDelete(id) {
+    const confirmMsg = "Are you sure you want to delete this deduction?";
+    if (!window.confirm(confirmMsg)) return;
+    await supabase
+      .from("deductions_reimbursements")
+      .delete()
+      .eq("id", id);
+    fetchDeductions();
+  }
+
+  return (
+    <div className="p-4">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Deductions / Reimbursements</h1>
+        <Button onClick={openAddModal}>Add Entry</Button>
+      </div>
+
+      <Table striped>
+        <TableHead>
+          <TableRow>
+            <TableHeader>Agent</TableHeader>
+            <TableHeader>Type</TableHeader>
+            <TableHeader>Reason</TableHeader>
+            <TableHeader>Amount</TableHeader>
+            <TableHeader>Linked Report (Batch)</TableHeader>
+            <TableHeader>Status</TableHeader>
+            <TableHeader>Actions</TableHeader>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {deductions.map((ded) => {
+            const ag = agents.find((a) => a.id === ded.agent_id);
+            const r = reports.find((rep) => rep.id === ded.payroll_report_id);
+            // Show the batch name from payroll_report_batches
+            const batchLabel = r?.payroll_report_batches?.batch_name || "—";
+            return (
+              <TableRow key={ded.id}>
+                <TableCell>{ag?.name || ag?.identifier || "Unknown"}</TableCell>
+                <TableCell>{ded.type}</TableCell>
+                <TableCell>{ded.reason || "-"}</TableCell>
+                <TableCell>
+                  {"$" + (parseFloat(ded.amount) || 0).toFixed(2)}
+                </TableCell>
+                <TableCell>
+                  {batchLabel}
+                </TableCell>
+                <TableCell>
+                  {ded.is_completed ? (
+                    <span className="text-green-600">Completed</span>
+                  ) : (
+                    <span className="text-red-600">Open</span>
+                  )}
+                </TableCell>
+                <TableCell className="space-x-2">
+                  <Button size="sm" onClick={() => openEditModal(ded)}>
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleMarkDone(ded)}
+                  >
+                    {ded.is_completed ? "Re-open" : "Mark Done"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDelete(ded.id)}
+                  >
+                    Delete
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+
+      {/* Add / Edit Modal */}
+      <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} size="xl">
+        <DialogTitle>
+          {isEditing ? "Edit Entry" : "Add Deduction / Reimbursement"}
+        </DialogTitle>
+        <DialogBody>
+          <Field className="mb-4">
+            <Label>Agent</Label>
+            <Select
+              value={deductionData.agent_id}
+              onChange={(e) =>
+                setDeductionData({ ...deductionData, agent_id: e.target.value })
+              }
+            >
+              <option value="">Select agent...</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name || a.identifier}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field className="mb-4">
+            <Label>Type</Label>
+            <Select
+              value={deductionData.type}
+              onChange={(e) =>
+                setDeductionData({ ...deductionData, type: e.target.value })
+              }
+            >
+              <option value="deduction">Deduction</option>
+              <option value="reimbursement">Reimbursement</option>
+            </Select>
+          </Field>
+
+          <Field className="mb-4">
+            <Label>Reason</Label>
+            <Input
+              type="text"
+              value={deductionData.reason}
+              onChange={(e) =>
+                setDeductionData({ ...deductionData, reason: e.target.value })
+              }
+            />
+          </Field>
+
+          <Field className="mb-4">
+            <Label>Amount</Label>
+            <Input
+              type="number"
+              value={deductionData.amount}
+              onChange={(e) =>
+                setDeductionData({ ...deductionData, amount: e.target.value })
+              }
+            />
+          </Field>
+        </DialogBody>
+        <DialogActions>
+          <Button plain onClick={() => setIsModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={saveDeduction}>{isEditing ? "Save" : "Add"}</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Mark Done Modal */}
+      <Dialog
+        open={isCompleteModalOpen}
+        onClose={() => setIsCompleteModalOpen(false)}
+        size="md"
+      >
+        <DialogTitle>Complete Deduction</DialogTitle>
+        <DialogBody>
+          <Field className="mb-4">
+            <Label>Select Report (Batch)</Label>
+            <Select
+              value={completeReportId}
+              onChange={(e) => setCompleteReportId(e.target.value)}
+            >
+              <option value="">(None)</option>
+              {reports.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {/* Show batch_name from the joined object */}
+                  {r.payroll_report_batches?.batch_name || "Unnamed Batch"}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </DialogBody>
+        <DialogActions>
+          <Button plain onClick={() => setIsCompleteModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={completeDeduction}>Mark as Done</Button>
+        </DialogActions>
+      </Dialog>
+    </div>
+  );
+}
+
+
+
+// app/protected/frontend/page.jsx
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { Button } from "@/components/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/table";
+import { Checkbox } from "@/components/checkbox";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  EllipsisVerticalIcon,
+} from "@heroicons/react/20/solid";
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownItem,
+  DropdownMenu,
+  DropdownDivider,
+} from "@/components/dropdown";
+
+export default function ReportsPage() {
+  const supabase = useMemo(() => createClient(), []);
+  const [batches, setBatches] = useState([]);
+  const [selectedBatchId, setSelectedBatchId] = useState(null);
+  const [reportLines, setReportLines] = useState([]);
+  const [expandedAgents, setExpandedAgents] = useState(new Set());
+  const [loading, setLoading] = useState(false);
+  const [wgeMap, setWgeMap] = useState({});
+  const [fwgMap, setFwgMap] = useState({});
+  const [batchPaidMap, setBatchPaidMap] = useState({});
+
+  useEffect(() => {
+    fetchBatches();
+  }, []);
+
+  async function fetchBatches() {
+    setLoading(true);
+    const { data: batchData, error: batchError } = await supabase
+      .from("payroll_report_batches")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (batchError) {
+      console.error("Error fetching batches:", batchError);
+      setLoading(false);
+      return;
+    }
+    if (!batchData) {
+      setLoading(false);
+      return;
+    }
+    const newBatchPaidMap = {};
+    for (const batch of batchData) {
+      const { data: reportsData } = await supabase
+        .from("payroll_reports")
+        .select("frontend_is_paid")
+        .eq("batch_id", batch.id);
+      if (reportsData && reportsData.length > 0) {
+        const total = reportsData.length;
+        const paidCount = reportsData.filter((r) => r.frontend_is_paid).length;
+        const pct = ((paidCount / total) * 100).toFixed(2);
+        newBatchPaidMap[batch.id] = { paidPercentage: parseFloat(pct) };
+      } else {
+        newBatchPaidMap[batch.id] = { paidPercentage: 0 };
+      }
+    }
+    setBatches(batchData);
+    setBatchPaidMap(newBatchPaidMap);
+    setLoading(false);
+  }
+
+  async function loadBatchDetails(batch_id) {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("payroll_reports")
+      .select("*")
+      .eq("batch_id", batch_id);
+    if (error || !data) {
+      setLoading(false);
+      return;
+    }
+    data.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+    const allWgeIds = [];
+    const allFwgIds = [];
+    for (const line of data) {
+      if (Array.isArray(line.details)) {
+        for (const d of line.details) {
+          if (d.white_glove_entry_id) allWgeIds.push(d.white_glove_entry_id);
+          if (d.fidium_white_glove_id) allFwgIds.push(d.fidium_white_glove_id);
+        }
+      }
+    }
+
+    let wgeById = {};
+    if (allWgeIds.length > 0) {
+      const { data: wgeData } = await supabase
+        .from("white_glove_entries")
+        .select("*")
+        .in("id", allWgeIds);
+      (wgeData || []).forEach((w) => {
+        wgeById[w.id] = w;
+      });
+    }
+
+    let fwgById = {};
+    if (allFwgIds.length > 0) {
+      const { data: fwgData } = await supabase
+        .from("fidium_white_glove_entries")
+        .select("*")
+        .in("id", allFwgIds);
+      (fwgData || []).forEach((f) => {
+        fwgById[f.id] = f;
+      });
+    }
+
+    // Auto-check if line is fully paid
+    for (const line of data) {
+      const lineAccs = Array.isArray(line.details) ? line.details : [];
+      const allPaid =
+        lineAccs.length > 0 &&
+        lineAccs.every((acc) => {
+          if (acc.white_glove_entry_id)
+            return wgeById[acc.white_glove_entry_id]?.frontend_paid;
+          if (acc.fidium_white_glove_id)
+            return fwgById[acc.fidium_white_glove_id]?.frontend_paid;
+          return true;
+        });
+      if (allPaid && !line.frontend_is_paid) {
+        line.frontend_is_paid = true;
+        supabase
+          .from("payroll_reports")
+          .update({ frontend_is_paid: true })
+          .eq("id", line.id);
+      }
+    }
+
+    setReportLines(data);
+    setWgeMap(wgeById);
+    setFwgMap(fwgById);
+    setExpandedAgents(new Set());
+    setLoading(false);
+  }
+
+  function enterBatch(batch_id) {
+    setSelectedBatchId(batch_id);
+    loadBatchDetails(batch_id);
+  }
+
+  async function goBack() {
+    setSelectedBatchId(null);
+    setReportLines([]);
+    setWgeMap({});
+    setFwgMap({});
+    await fetchBatches();
+  }
+
+  function toggleAgentExpand(line) {
+    setExpandedAgents((prev) => {
+      const newSet = new Set(prev);
+      newSet.has(line.id) ? newSet.delete(line.id) : newSet.add(line.id);
+      return newSet;
+    });
+  }
+
+  async function togglePaid(line) {
+    const newPaidValue = !line.frontend_is_paid;
+    const { data: updatedLineData } = await supabase
+      .from("payroll_reports")
+      .update({ frontend_is_paid: newPaidValue })
+      .eq("id", line.id)
+      .select("*");
+    if (!updatedLineData) return;
+    const updatedLine = updatedLineData[0];
+
+    const lineAccs = Array.isArray(updatedLine.details)
+      ? updatedLine.details
+      : [];
+    const wIds = lineAccs
+      .filter((d) => d.white_glove_entry_id)
+      .map((d) => d.white_glove_entry_id);
+    const fIds = lineAccs
+      .filter((d) => d.fidium_white_glove_id)
+      .map((d) => d.fidium_white_glove_id);
+
+    if (wIds.length > 0) {
+      await supabase
+        .from("white_glove_entries")
+        .update({ frontend_paid: newPaidValue })
+        .in("id", wIds);
+      const newMap = { ...wgeMap };
+      wIds.forEach((id) => {
+        if (newMap[id]) newMap[id].frontend_paid = newPaidValue;
+      });
+      setWgeMap(newMap);
+    }
+
+    if (fIds.length > 0) {
+      await supabase
+        .from("fidium_white_glove_entries")
+        .update({ frontend_paid: newPaidValue })
+        .in("id", fIds);
+      const newMap = { ...fwgMap };
+      fIds.forEach((id) => {
+        if (newMap[id]) newMap[id].frontend_paid = newPaidValue;
+      });
+      setFwgMap(newMap);
+    }
+
+    setReportLines((prev) => prev.map((r) => (r.id === line.id ? updatedLine : r)));
+    if (newPaidValue) {
+      setExpandedAgents((prev) => new Set([...prev, updatedLine.id]));
+    }
+  }
+
+  async function toggleAccountPaid(line, type, entryId) {
+    const newPaidValue =
+      type === "white"
+        ? !wgeMap[entryId]?.frontend_paid
+        : !fwgMap[entryId]?.frontend_paid;
+
+    if (type === "white") {
+      await supabase
+        .from("white_glove_entries")
+        .update({ frontend_paid: newPaidValue })
+        .eq("id", entryId);
+      setWgeMap((prev) => ({
+        ...prev,
+        [entryId]: { ...prev[entryId], frontend_paid: newPaidValue },
+      }));
+    } else {
+      await supabase
+        .from("fidium_white_glove_entries")
+        .update({ frontend_paid: newPaidValue })
+        .eq("id", entryId);
+      setFwgMap((prev) => ({
+        ...prev,
+        [entryId]: { ...prev[entryId], frontend_paid: newPaidValue },
+      }));
+    }
+
+    const lineAccs = Array.isArray(line.details) ? line.details : [];
+    const allPaid = lineAccs.every((acc) => {
+      if (acc.white_glove_entry_id && wgeMap[acc.white_glove_entry_id]) {
+        return (
+          wgeMap[acc.white_glove_entry_id].frontend_paid === true ||
+          (acc.white_glove_entry_id === entryId && newPaidValue)
+        );
+      }
+      if (acc.fidium_white_glove_id && fwgMap[acc.fidium_white_glove_id]) {
+        return (
+          fwgMap[acc.fidium_white_glove_id].frontend_paid === true ||
+          (acc.fidium_white_glove_id === entryId && newPaidValue)
+        );
+      }
+      return true;
+    });
+    if (allPaid && !line.frontend_is_paid) {
+      await supabase
+        .from("payroll_reports")
+        .update({ frontend_is_paid: true })
+        .eq("id", line.id);
+      setReportLines((prev) =>
+        prev.map((r) => (r.id === line.id ? { ...r, frontend_is_paid: true } : r))
+      );
+    } else if (!allPaid && line.frontend_is_paid) {
+      await supabase
+        .from("payroll_reports")
+        .update({ frontend_is_paid: false })
+        .eq("id", line.id);
+      setReportLines((prev) =>
+        prev.map((r) => (r.id === line.id ? { ...r, frontend_is_paid: false } : r))
+      );
+    }
+  }
+
+  function getPaidPercentage() {
+    if (reportLines.length === 0) return "0";
+    const paidCount = reportLines.filter((r) => r.frontend_is_paid).length;
+    return ((paidCount / reportLines.length) * 100).toFixed(2);
+  }
+
+  async function renameBatch(batch) {
+    const newName = window.prompt("New batch name?", batch.batch_name);
+    if (newName && newName.trim()) {
+      await supabase
+        .from("payroll_report_batches")
+        .update({ batch_name: newName.trim() })
+        .eq("id", batch.id);
+      fetchBatches();
+    }
+  }
+
+  async function deleteBatch(batch) {
+    if (confirm(`Delete batch ${batch.batch_name}?`)) {
+      await supabase.from("payroll_reports").delete().eq("batch_id", batch.id);
+      await supabase.from("payroll_report_batches").delete().eq("id", batch.id);
+      fetchBatches();
+    }
+  }
+
+  if (!selectedBatchId) {
+    return (
+      <div className="p-6 space-y-6 font-sans text-gray-900">
+        <h2 className="text-2xl font-bold text-center">
+          Saved Payroll Batches (Frontend)
+        </h2>
+        {loading && <div>Loading...</div>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {batches.map((b) => {
+            const info = batchPaidMap[b.id] || { paidPercentage: 0 };
+            const pct = info.paidPercentage;
+            return (
+              <div
+                key={b.id}
+                className="border rounded flex flex-col items-center cursor-pointer relative"
+                onClick={() => enterBatch(b.id)}
+                style={{
+                  background: `linear-gradient(to right, #22c55e ${pct}%, #e5e7eb ${pct}%)`,
+                }}
+              >
+                <div className="absolute top-2 left-2 bg-white bg-opacity-90 text-gray-800 text-sm font-bold px-2 py-1 rounded">
+                  {pct}% Paid Out
+                </div>
+                <div
+                  className="absolute top-2 right-2 z-10"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Dropdown>
+                    <DropdownButton as="div" className="cursor-pointer flex items-center">
+                      <EllipsisVerticalIcon className="h-5 w-5 text-gray-500" />
+                    </DropdownButton>
+                    <DropdownMenu className="min-w-32" anchor="bottom end">
+                      <DropdownItem onClick={() => renameBatch(b)}>
+                        Rename
+                      </DropdownItem>
+                      <DropdownDivider />
+                      <DropdownItem onClick={() => deleteBatch(b)}>
+                        Delete
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
+                </div>
+                <div
+                  className="w-full py-6 flex flex-col items-center"
+                  style={{ pointerEvents: "none" }}
+                >
+                  <span className="text-lg font-semibold">{b.batch_name}</span>
+                  <div className="text-sm text-gray-700">
+                    Created: {new Date(b.created_at).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  const paidPctNumber = parseFloat(getPaidPercentage());
+
+  return (
+    <div className="p-6 space-y-6 font-sans text-gray-900">
+      <Button onClick={goBack}>Back to Batches</Button>
+      <h3 className="text-lg font-bold mt-4">Batch Details (Frontend)</h3>
+      <div className="flex items-center space-x-4 mb-4">
+        <div>Total lines: {reportLines.length}</div>
+        <div>{getPaidPercentage()}% paid out</div>
+      </div>
+      <div className="w-full bg-gray-200 h-2 rounded">
+        <div
+          className="bg-green-500 h-2 rounded"
+          style={{ width: `${paidPctNumber}%` }}
+        />
+      </div>
+      {loading && <div>Loading...</div>}
+      <Table striped>
+        <TableHead>
+          <TableRow>
+            <TableHeader />
+            <TableHeader>Paid?</TableHeader>
+            <TableHeader>Name</TableHeader>
+            <TableHeader># Accounts</TableHeader>
+            <TableHeader>Personal Total</TableHeader>
+            <TableHeader>Manager Total</TableHeader>
+            <TableHeader>Upfront</TableHeader>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {reportLines.map((line) => {
+            const isExpanded = expandedAgents.has(line.id);
+            const personalTotalDisplay =
+              typeof line.personal_total === "number"
+                ? `$${line.personal_total.toFixed(2)}`
+                : "N/A";
+            const managerTotalDisplay =
+              typeof line.manager_total === "number" && line.manager_total > 0
+                ? `$${line.manager_total.toFixed(2)}`
+                : "N/A";
+            const upfrontDisplay =
+              line.upfront_value !== null && !isNaN(line.upfront_value)
+                ? `$${line.upfront_value.toFixed(2)} (${line.upfront_percentage}%)`
+                : "N/A";
+
+            return (
+              <React.Fragment key={line.id}>
+                <TableRow className={line.frontend_is_paid ? "bg-green-100" : ""}>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="plain"
+                      onClick={() => toggleAgentExpand(line)}
+                    >
+                      {isExpanded ? (
+                        <ChevronUpIcon className="h-5 w-5" />
+                      ) : (
+                        <ChevronDownIcon className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </TableCell>
+                  <TableCell>
+                    <Checkbox
+                      checked={line.frontend_is_paid}
+                      onChange={() => togglePaid(line)}
+                    />
+                  </TableCell>
+                  <TableCell>{line.name}</TableCell>
+                  <TableCell>{line.accounts}</TableCell>
+                  <TableCell>{personalTotalDisplay}</TableCell>
+                  <TableCell>{managerTotalDisplay}</TableCell>
+                  <TableCell>{upfrontDisplay}</TableCell>
+                </TableRow>
+                {isExpanded && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="bg-gray-50">
+                      <div className="p-4">
+                        <h4 className="font-bold mb-2">Sales Details</h4>
+                        <Table striped>
+                          <TableHead>
+                            <TableRow>
+                              <TableHeader />
+                              <TableHeader>Order #</TableHeader>
+                              <TableHeader>Customer Name</TableHeader>
+                              <TableHeader>Address</TableHeader>
+                              <TableHeader>Plan</TableHeader>
+                              <TableHeader>Install Date</TableHeader>
+                              <TableHeader>Personal Comm</TableHeader>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {(line.details || []).map((acc, idx) => {
+                              if (acc.white_glove_entry_id) {
+                                const w = wgeMap[acc.white_glove_entry_id];
+                                if (!w) return null;
+                                const comm = `$${(
+                                  acc.personal_commission || 0
+                                ).toFixed(2)}`;
+                                const iDate = w.install_date
+                                  ? new Date(w.install_date).toLocaleDateString()
+                                  : "N/A";
+                                const isPaid = w.frontend_paid;
+                                return (
+                                  <TableRow
+                                    key={idx}
+                                    className={isPaid ? "bg-green-50" : ""}
+                                  >
+                                    <TableCell>
+                                      <Checkbox
+                                        checked={isPaid}
+                                        onChange={() =>
+                                          toggleAccountPaid(line, "white", w.id)
+                                        }
+                                      />
+                                    </TableCell>
+                                    <TableCell>{w.order_number}</TableCell>
+                                    <TableCell>{w.customer_name}</TableCell>
+                                    <TableCell>
+                                      {(w.customer_street_address || "") +
+                                        " " +
+                                        (w.customer_city || "") +
+                                        " " +
+                                        (w.customer_state || "")}
+                                    </TableCell>
+                                    <TableCell>
+                                      {w.internet_speed || "N/A"}
+                                    </TableCell>
+                                    <TableCell>{iDate}</TableCell>
+                                    <TableCell>{comm}</TableCell>
+                                  </TableRow>
+                                );
+                              } else if (acc.fidium_white_glove_id) {
+                                const f = fwgMap[acc.fidium_white_glove_id];
+                                if (!f) return null;
+                                const comm = `$${(
+                                  acc.personal_commission || 0
+                                ).toFixed(2)}`;
+                                const iDate = f.install_date
+                                  ? new Date(f.install_date).toLocaleDateString()
+                                  : "N/A";
+                                const isPaid = f.frontend_paid;
+                                return (
+                                  <TableRow
+                                    key={idx}
+                                    className={isPaid ? "bg-green-50" : ""}
+                                  >
+                                    <TableCell>
+                                      <Checkbox
+                                        checked={isPaid}
+                                        onChange={() =>
+                                          toggleAccountPaid(line, "fidium", f.id)
+                                        }
+                                      />
+                                    </TableCell>
+                                    <TableCell>{f.order_number}</TableCell>
+                                    <TableCell>{f.customer_name}</TableCell>
+                                    <TableCell>{f.service_address}</TableCell>
+                                    <TableCell>
+                                      {f.requested_services || "N/A"}
+                                    </TableCell>
+                                    <TableCell>{iDate}</TableCell>
+                                    <TableCell>{comm}</TableCell>
+                                  </TableRow>
+                                );
+                              } else {
+                                return null;
+                              }
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 
 
 // app/protected/payroll/FidiumFlow.jsx
@@ -19,9 +1974,62 @@ import { Input } from "@/components/input";
 import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/20/solid";
 
 /**
- * Plan-based override for Fidium manager:
- *  1) Check fidium_manager_agent_commissions for (manager, agent, fidium_plan).
- *  2) If found, see if there's a date range row in fidium_manager_agent_commission_date_ranges for that plan.
+ * Safely parse a US-format date string ("MM/DD/YY" or "MM/DD/YYYY").
+ */
+function parseUSDate(dateStr) {
+  if (!dateStr || typeof dateStr !== "string") return null;
+  const parts = dateStr.split("/").map((p) => p.trim());
+  if (parts.length === 3) {
+    let mm = parseInt(parts[0], 10);
+    let dd = parseInt(parts[1], 10);
+    let yy = parseInt(parts[2], 10);
+    if (!isNaN(mm) && !isNaN(dd) && !isNaN(yy)) {
+      if (yy < 50) yy += 2000;
+      else if (yy < 100) yy += 1900;
+      const parsed = new Date(yy, mm - 1, dd);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+  }
+  const fallback = new Date(dateStr);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+/**
+ * Insert or update Fidium White Glove rows into "fidium_white_glove_entries" table.
+ */
+async function insertFidiumWhiteGloveEntries(supabase, fidiumRows) {
+  const entries = fidiumRows.map((row) => ({
+    sales_partner: row["SALES_PARTNER"] || null,
+    dsi_dealer_type: row["DSI_DEALER_TYPE"] || null,
+    sale_format: row["SALE_FORMAT"] || null,
+    sales_rep: row["SALES_REP"] || null,
+    submission_date: parseUSDate(row["SUBMISSION_DATE"]),
+    customer_name: row["CUSTOMER_NAME"] || null,
+    service_address: row["SERVICE_ADDRESS"] || null,
+    city: row["CITY"] || null,
+    state: row["STATE"] || null,
+    zip: row["ZIP"] || null,
+    order_type: row["ORDER_TYPE"] || null,
+    requested_services: row["REQUESTED_SERVICES"] || null,
+    status_change_date: parseUSDate(row["STATUS_CHANGE_DATE"]),
+    sales_status: row["SALES_STATUS"] || null,
+    install_status: row["INSTALL_STATUS"] || null,
+    order_number: row["ORDER_NUMBER"] || null,
+    install_date: parseUSDate(row["INSTALL_DATE"]),
+    amount: row["Amount"] ? parseFloat(row["Amount"]) : null,
+    frontend_paid: false,
+    backend_paid: false,
+  }));
+
+  // Upsert by (order_number, requested_services)
+  await supabase
+    .from("fidium_white_glove_entries")
+    .upsert(entries, { onConflict: "order_number,requested_services" });
+}
+
+/**
+ * Manager override for (manager, agent, fidium_plan),
+ * then date-range override inside fidium_manager_agent_commission_date_ranges.
  */
 async function getFidiumManagerOverride({
   supabase,
@@ -40,11 +2048,9 @@ async function getFidiumManagerOverride({
     .eq("fidium_plan_id", planId);
 
   if (!overrideRows || overrideRows.length === 0) return null;
-
   const override = overrideRows[0];
   const baseVal = override.manager_commission_value;
 
-  // date ranges for that override + plan
   const { data: rangeRows } = await supabase
     .from("fidium_manager_agent_commission_date_ranges")
     .select("*")
@@ -53,7 +2059,9 @@ async function getFidiumManagerOverride({
 
   if (!rangeRows || rangeRows.length === 0) return baseVal;
 
-  const subDate = submissionDate instanceof Date ? submissionDate : new Date(submissionDate);
+  const subDate = submissionDate instanceof Date ? submissionDate : parseUSDate(submissionDate);
+  if (!subDate) return baseVal;
+
   let matchedRange = null;
   for (const rr of rangeRows) {
     const start = new Date(rr.start_date);
@@ -65,13 +2073,11 @@ async function getFidiumManagerOverride({
       }
     }
   }
-
-  if (matchedRange) return matchedRange.manager_commission_value;
-  return baseVal;
+  return matchedRange ? matchedRange.manager_commission_value : baseVal;
 }
 
 /**
- * Fidium personal commission = plan-based + optional plan-based date ranges
+ * Fidium personal payscale => check date ranges.
  */
 async function getFidiumPersonalCommission({
   supabase,
@@ -79,12 +2085,15 @@ async function getFidiumPersonalCommission({
   fidiumPlanId,
   submissionDate,
 }) {
+  if (!fidiumPersonalPayscaleId || !fidiumPlanId) return 0;
+
   const { data: drs } = await supabase
     .from("fidium_personal_payscale_date_ranges")
     .select("*, fidium_personal_payscale_date_range_plan_commissions(*)")
     .eq("fidium_personal_payscale_id", fidiumPersonalPayscaleId);
 
   if (!drs || drs.length === 0) {
+    // fallback to base
     const { data: baseComm } = await supabase
       .from("fidium_personal_payscale_plan_commissions")
       .select("*")
@@ -94,12 +2103,24 @@ async function getFidiumPersonalCommission({
     return baseComm?.rep_commission_value || 0;
   }
 
-  const subDateObj = new Date(submissionDate);
+  const subDate =
+    submissionDate instanceof Date ? submissionDate : parseUSDate(submissionDate);
+  if (!subDate) {
+    // fallback
+    const { data: baseComm } = await supabase
+      .from("fidium_personal_payscale_plan_commissions")
+      .select("*")
+      .eq("fidium_personal_payscale_id", fidiumPersonalPayscaleId)
+      .eq("fidium_plan_id", fidiumPlanId)
+      .single();
+    return baseComm?.rep_commission_value || 0;
+  }
+
   let matchedRange = null;
   for (const dr of drs) {
     const start = new Date(dr.start_date);
     const end = dr.end_date ? new Date(dr.end_date) : null;
-    if (subDateObj >= start && (!end || subDateObj <= end)) {
+    if (subDate >= start && (!end || subDate <= end)) {
       if (!matchedRange) matchedRange = dr;
       else if (new Date(dr.start_date) > new Date(matchedRange.start_date)) {
         matchedRange = dr;
@@ -111,19 +2132,20 @@ async function getFidiumPersonalCommission({
       (x) => x.fidium_plan_id === fidiumPlanId
     );
     return pc?.rep_commission_value || 0;
-  } else {
-    const { data: baseComm } = await supabase
-      .from("fidium_personal_payscale_plan_commissions")
-      .select("*")
-      .eq("fidium_personal_payscale_id", fidiumPersonalPayscaleId)
-      .eq("fidium_plan_id", fidiumPlanId)
-      .single();
-    return baseComm?.rep_commission_value || 0;
   }
+
+  // no match => base
+  const { data: fallbackComm } = await supabase
+    .from("fidium_personal_payscale_plan_commissions")
+    .select("*")
+    .eq("fidium_personal_payscale_id", fidiumPersonalPayscaleId)
+    .eq("fidium_plan_id", fidiumPlanId)
+    .single();
+  return fallbackComm?.rep_commission_value || 0;
 }
 
 /**
- * Fidium manager payscale is also plan-based, with optional date ranges
+ * Fidium manager payscale => check date ranges.
  */
 async function getFidiumManagerCommission({
   supabase,
@@ -131,12 +2153,15 @@ async function getFidiumManagerCommission({
   fidiumPlanId,
   submissionDate,
 }) {
+  if (!fidiumManagerPayscaleId || !fidiumPlanId) return 0;
+
   const { data: drs } = await supabase
     .from("fidium_manager_payscale_date_ranges")
     .select("*, fidium_manager_payscale_date_range_plan_commissions(*)")
     .eq("fidium_manager_payscale_id", fidiumManagerPayscaleId);
 
   if (!drs || drs.length === 0) {
+    // fallback
     const { data: baseComm } = await supabase
       .from("fidium_manager_payscale_plan_commissions")
       .select("*")
@@ -146,34 +2171,44 @@ async function getFidiumManagerCommission({
     return baseComm?.manager_commission_value || 0;
   }
 
-  const subDateObj = new Date(submissionDate);
+  const subDate =
+    submissionDate instanceof Date ? submissionDate : parseUSDate(submissionDate);
+  if (!subDate) {
+    const { data: baseComm } = await supabase
+      .from("fidium_manager_payscale_plan_commissions")
+      .select("*")
+      .eq("fidium_manager_payscale_id", fidiumManagerPayscaleId)
+      .eq("fidium_plan_id", fidiumPlanId)
+      .single();
+    return baseComm?.manager_commission_value || 0;
+  }
+
   let matchedRange = null;
   for (const dr of drs) {
     const start = new Date(dr.start_date);
     const end = dr.end_date ? new Date(dr.end_date) : null;
-    if (subDateObj >= start && (!end || subDateObj <= end)) {
-      if (!matchedRange) {
-        matchedRange = dr;
-      } else if (new Date(dr.start_date) > new Date(matchedRange.start_date)) {
+    if (subDate >= start && (!end || subDate <= end)) {
+      if (!matchedRange) matchedRange = dr;
+      else if (new Date(dr.start_date) > new Date(matchedRange.start_date)) {
         matchedRange = dr;
       }
     }
   }
-
   if (matchedRange) {
     const pc = matchedRange.fidium_manager_payscale_date_range_plan_commissions.find(
       (x) => x.fidium_plan_id === fidiumPlanId
     );
     return pc?.manager_commission_value || 0;
-  } else {
-    const { data: baseComm } = await supabase
-      .from("fidium_manager_payscale_plan_commissions")
-      .select("*")
-      .eq("fidium_manager_payscale_id", fidiumManagerPayscaleId)
-      .eq("fidium_plan_id", fidiumPlanId)
-      .single();
-    return baseComm?.manager_commission_value || 0;
   }
+
+  // no match => base
+  const { data: fallbackComm } = await supabase
+    .from("fidium_manager_payscale_plan_commissions")
+    .select("*")
+    .eq("fidium_manager_payscale_id", fidiumManagerPayscaleId)
+    .eq("fidium_plan_id", fidiumPlanId)
+    .single();
+  return fallbackComm?.manager_commission_value || 0;
 }
 
 export default function FidiumFlow({ supabase }) {
@@ -210,7 +2245,9 @@ export default function FidiumFlow({ supabase }) {
           const fidiumRows = res.data || [];
           await upsertFidiumPlans(fidiumRows);
           await upsertFidiumSalesmen(fidiumRows);
-          await insertFidiumWhiteGloveEntries(fidiumRows);
+          // Actually insert into fidium_white_glove_entries
+          await insertFidiumWhiteGloveEntries(supabase, fidiumRows);
+          // Now compute the final Fidium payroll
           await generateFidiumReport(fidiumRows);
         } catch (err) {
           console.error("Error processing Fidium CSV:", err);
@@ -250,46 +2287,9 @@ export default function FidiumFlow({ supabase }) {
     }
   }
 
-  async function insertFidiumWhiteGloveEntries(fidiumRows) {
-    function parseDate(dateStr) {
-      if (!dateStr) return null;
-      const d = new Date(dateStr);
-      return isNaN(d.getTime()) ? null : d;
-    }
-    function parseFloatOrNull(val) {
-      if (!val) return null;
-      const f = parseFloat(val);
-      return isNaN(f) ? null : f;
-    }
-
-    const entries = fidiumRows.map((row) => ({
-      sales_partner: row["SALES_PARTNER"] || null,
-      dsi_dealer_type: row["DSI_DEALER_TYPE"] || null,
-      sale_format: row["SALE_FORMAT"] || null,
-      sales_rep: row["SALES_REP"] || null,
-      submission_date: parseDate(row["SUBMISSION_DATE"]),
-      customer_name: row["CUSTOMER_NAME"] || null,
-      service_address: row["SERVICE_ADDRESS"] || null,
-      city: row["CITY"] || null,
-      state: row["STATE"] || null,
-      zip: row["ZIP"] || null,
-      order_type: row["ORDER_TYPE"] || null,
-      requested_services: row["REQUESTED_SERVICES"] || null,
-      status_change_date: parseDate(row["STATUS_CHANGE_DATE"]),
-      sales_status: row["SALES_STATUS"] || null,
-      install_status: row["INSTALL_STATUS"] || null,
-      order_number: row["ORDER_NUMBER"] || null,
-      install_date: parseDate(row["INSTALL_DATE"]),
-      amount: parseFloatOrNull(row["Amount"]),
-      frontend_paid: false,
-      backend_paid: false,
-    }));
-
-    await supabase
-      .from("fidium_white_glove_entries")
-      .upsert(entries, { onConflict: "order_number,requested_services" });
-  }
-
+  /**
+   * Build the final Fidium commission report
+   */
   async function generateFidiumReport(fidiumRows) {
     const { data: agents } = await supabase.from("agents").select("*");
     const { data: agentManagers } = await supabase.from("agent_managers").select("*");
@@ -298,12 +2298,14 @@ export default function FidiumFlow({ supabase }) {
     const { data: fidPers } = await supabase.from("fidium_personal_payscales").select("*");
     const { data: fidMgr } = await supabase.from("fidium_manager_payscales").select("*");
 
+    // build a map (orderNum||requested_services) -> fidium white glove row
     const fwgByCombo = {};
     (fwgAll || []).forEach((fwg) => {
       const key = `${fwg.order_number}||${(fwg.requested_services || "").trim()}`;
       fwgByCombo[key] = fwg;
     });
 
+    // agent's Fidium ID -> agent
     const agentByFidiumId = {};
     (agents || []).forEach((a) => {
       if (a.fidium_identifier) {
@@ -311,6 +2313,7 @@ export default function FidiumFlow({ supabase }) {
       }
     });
 
+    // plan name -> plan object
     const fPlanByName = {};
     (fPlans || []).forEach((p) => {
       if (p.name) {
@@ -318,11 +2321,13 @@ export default function FidiumFlow({ supabase }) {
       }
     });
 
+    // manager relationship
     const managerFor = {};
     (agentManagers || []).forEach((am) => {
       managerFor[am.agent_id] = am.manager_id;
     });
 
+    // build totals
     const totals = {};
     (agents || []).forEach((a) => {
       if (a.fidium_identifier) {
@@ -354,19 +2359,20 @@ export default function FidiumFlow({ supabase }) {
       const agent = agentByFidiumId[rep];
       if (!agent) continue;
 
-      const rawPlan = row["REQUESTED_SERVICES"]?.trim();
-      if (!rawPlan) continue;
-      const plan = fPlanByName[rawPlan];
+      const planName = row["REQUESTED_SERVICES"]?.trim();
+      if (!planName) continue;
+      const plan = fPlanByName[planName];
       if (!plan) continue;
 
-      const orderNum = row["ORDER_NUMBER"]?.trim();
-      const svc = row["REQUESTED_SERVICES"]?.trim();
+      // combine key
+      const orderNum = row["ORDER_NUMBER"]?.trim() || "";
+      const svc = row["REQUESTED_SERVICES"]?.trim() || "";
       const comboKey = `${orderNum}||${svc}`;
       const fwgRow = fwgByCombo[comboKey];
 
-      const submissionDate = row["SUBMISSION_DATE"] ? new Date(row["SUBMISSION_DATE"]) : null;
+      const submissionDate = parseUSDate(row["SUBMISSION_DATE"]) || null;
 
-      // personal
+      // personal commission
       let personalVal = 0;
       if (agent.fidium_personal_payscale_id) {
         personalVal = await getFidiumPersonalCommission({
@@ -388,9 +2394,8 @@ export default function FidiumFlow({ supabase }) {
           .select("*")
           .eq("id", mgrId)
           .maybeSingle();
-
-        if (managerAgent && managerAgent.fidium_manager_payscale_id) {
-          // plan-based override
+        if (managerAgent) {
+          // override
           const overrideVal = await getFidiumManagerOverride({
             supabase,
             managerId: mgrId,
@@ -400,8 +2405,8 @@ export default function FidiumFlow({ supabase }) {
           });
           if (overrideVal !== null) {
             managerVal = overrideVal;
-          } else {
-            // fallback to manager payscale
+          } else if (managerAgent.fidium_manager_payscale_id) {
+            // fallback
             managerVal = await getFidiumManagerCommission({
               supabase,
               fidiumManagerPayscaleId: managerAgent.fidium_manager_payscale_id,
@@ -409,24 +2414,36 @@ export default function FidiumFlow({ supabase }) {
               submissionDate,
             });
           }
+          if (!totals[mgrId]) {
+            totals[mgrId] = {
+              name: managerAgent.name || managerAgent.identifier,
+              accounts: 0,
+              personalTotal: 0,
+              managerTotal: 0,
+              upfront_percentage: 0,
+              backend_percentage: 0,
+              details: [],
+            };
+          }
           totals[mgrId].managerTotal += managerVal;
         }
       }
 
+      // detail
       totals[agent.id].details.push({
         fidium_white_glove_id: fwgRow?.id,
         personal_commission: personalVal,
       });
     }
 
+    // convert to array
     const finalReport = Object.entries(totals)
-      .filter(([_, data]) => data.accounts > 0)
+      .filter(([_, data]) => data.accounts > 0 || data.managerTotal > 0)
       .map(([agentId, data]) => {
-        const personalTotal = data.personalTotal;
-        const managerTotal = data.managerTotal;
+        const { personalTotal, managerTotal, upfront_percentage, backend_percentage } = data;
         const grandTotal = personalTotal + managerTotal;
-        const upfrontValue = personalTotal * (data.upfront_percentage / 100);
-        const backendValue = personalTotal * (data.backend_percentage / 100);
+        const upfrontValue = personalTotal * (upfront_percentage / 100);
+        const backendValue = personalTotal * (backend_percentage / 100);
         return {
           agentId,
           name: data.name,
@@ -434,8 +2451,8 @@ export default function FidiumFlow({ supabase }) {
           personalTotal,
           managerTotal,
           grandTotal,
-          upfront_percentage: data.upfront_percentage,
-          backend_percentage: data.backend_percentage,
+          upfront_percentage,
+          backend_percentage,
           upfrontValue,
           backendValue,
           details: data.details,
@@ -624,10 +2641,82 @@ import { Input } from "@/components/input";
 import { ChevronDownIcon, ChevronUpIcon } from "@heroicons/react/20/solid";
 
 /**
- * Retrieves the manager->agent->plan override (if any).
- * Then checks if there's a date-range override for that plan, covering submissionDate.
- * If found, returns that plan’s override commission. Otherwise returns the base override.
- * If no plan-level override record at all, returns null.
+ * Safely parse a US-format date string ("MM/DD/YY" or "MM/DD/YYYY").
+ * If "YY" < 50 => assume 20YY, if "YY" in [50..99] => assume 19YY.
+ * Otherwise, fallback to built-in Date parsing.
+ */
+function parseUSDate(dateStr) {
+  if (!dateStr || typeof dateStr !== "string") return null;
+  const parts = dateStr.split("/").map((p) => p.trim());
+  if (parts.length === 3) {
+    let mm = parseInt(parts[0], 10);
+    let dd = parseInt(parts[1], 10);
+    let yy = parseInt(parts[2], 10);
+    if (!isNaN(mm) && !isNaN(dd) && !isNaN(yy)) {
+      if (yy < 50) yy += 2000;
+      else if (yy < 100) yy += 1900;
+      const parsed = new Date(yy, mm - 1, dd);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+  }
+  const fallback = new Date(dateStr);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
+/**
+ * Insert or update the matched White Glove rows, mapping from CSV headers 
+ * to columns in `white_glove_entries`, for matched new installs/migrations only.
+ */
+async function upsertMatchedWhiteGloveEntries(supabase, matchedWgRows) {
+  const entries = matchedWgRows.map((row) => ({
+    customer_name: row["Customer Name"] || null,
+    customer_street_address: row["Customer Street Address"] || null,
+    customer_city: row["Customer City (Zipcode as of 7/26/2024)"] || null,
+    customer_state: row["Customer State"] || null,
+    ban: row["BAN"] || null,
+    order_number: row["Order Number"] || null,
+    order_status: row["Order Status"] || null,
+    order_submission_date: parseUSDate(row["Order Submission Date"]),
+    original_due_date: parseUSDate(row["Original Due Date"]),
+    updated_due_date: parseUSDate(row["Updated Due Date"]),
+    order_completed_cancelled: row["Order Completed/Cancelled"] || null,
+    customer_cbr: row["Customer CBR"] || null,
+    partner_name: row["Partner Name"] || null,
+    partner_sales_code: row["Partner Sales Code"] || null,
+    audit_status: row["Audit Status"] || null,
+    audit_closed: row["Audit Closed no longer on form as of 11/22/2024"] || null,
+    who_cancelled_the_order: row["Who Cancelled the Order"] || null,
+    did_you_intervene_on_the_order: row["Did you intervene on the order"] || null,
+    notes: row["Notes"] || null,
+    item_type: row["Item Type"] || null,
+    path: row["Path"] || null,
+    due_date_helper: row["Due Date Helper"] || null,
+    migrating_from_legacy:
+      row[
+        "Is the customer Migrating from Legacy Services? (7/26/2024 DSL means yes blank field means No)"
+      ] || null,
+    legacy_or_brspd_fiber: row["Legacy or BRSPD Fiber?"] || null,
+    cancellation_reason: row["Cancellation Reason"] || null,
+    voice_qty: row["Voice_Qty"] ? parseInt(row["Voice_Qty"], 10) : null,
+    hsi_qty: row["HSI_Qty"] ? parseInt(row["HSI_Qty"], 10) : null,
+    internet_speed: row["Internet Speed"] || null,
+    agent_seller_information: row["Agent Seller Information"] || null,
+    modified_due_date: parseUSDate(row["Modified Due Date"]),
+    modified_month: row["Modified Month"] ? parseInt(row["Modified Month"], 10) : null,
+    month_issued: row["Month Issued"] ? parseInt(row["Month Issued"], 10) : null,
+    year_issued: row["Year Issued"] ? parseInt(row["Year Issued"], 10) : null,
+    month_completed: row["Month Completed"] ? parseInt(row["Month Completed"], 10) : null,
+    year_completed: row["Year Completed"] ? parseInt(row["Year Completed"], 10) : null,
+    month_due: row["Month Due"] ? parseInt(row["Month Due"], 10) : null,
+    year_due: row["Year Due"] ? parseInt(row["Year Due"], 10) : null,
+  }));
+  // Upsert by order_number
+  await supabase.from("white_glove_entries").upsert(entries, { onConflict: "order_number" });
+}
+
+/**
+ * manager->agent->plan override (if any), then check date-range overrides.
+ * Return override commission if matched, else the base override (or null if none).
  */
 async function getManagerOverrideCommission({
   supabase,
@@ -639,7 +2728,6 @@ async function getManagerOverrideCommission({
 }) {
   if (!managerId || !agentId || !planId) return null;
 
-  // 1) fetch override record (manager->agent->plan)
   const { data: overrideRows } = await supabase
     .from("manager_agent_commissions")
     .select("id, manager_commission_value, manager_upgrade_commission_value")
@@ -648,36 +2736,31 @@ async function getManagerOverrideCommission({
     .eq("plan_id", planId);
 
   if (!overrideRows || overrideRows.length === 0) return null;
-
-  const override = overrideRows[0]; // typically only one
+  const override = overrideRows[0];
   const baseVal = isUpgrade
     ? override.manager_upgrade_commission_value
     : override.manager_commission_value;
 
-  // 2) fetch date-range rows
   const { data: rangeRows } = await supabase
     .from("manager_agent_commission_date_ranges")
     .select("*")
     .eq("manager_agent_commission_id", override.id)
-    .eq("plan_id", planId); // must match the same plan
+    .eq("plan_id", planId);
 
-  if (!rangeRows || rangeRows.length === 0) {
-    return baseVal;
-  }
+  if (!rangeRows || rangeRows.length === 0) return baseVal;
 
-  const subDateObj = submissionDate instanceof Date ? submissionDate : new Date(submissionDate);
+  const subDate = submissionDate instanceof Date ? submissionDate : parseUSDate(submissionDate);
+  if (!subDate) return baseVal; // fallback if no valid date
+
   let matchedRange = null;
   for (const rr of rangeRows) {
     const start = new Date(rr.start_date);
     const end = rr.end_date ? new Date(rr.end_date) : null;
-    if (subDateObj >= start && (!end || subDateObj <= end)) {
-      if (!matchedRange) {
+    if (subDate >= start && (!end || subDate <= end)) {
+      // pick the latest start
+      if (!matchedRange) matchedRange = rr;
+      else if (new Date(rr.start_date) > new Date(matchedRange.start_date)) {
         matchedRange = rr;
-      } else {
-        // pick the one with the latest start_date <= subDateObj
-        if (new Date(rr.start_date) > new Date(matchedRange.start_date)) {
-          matchedRange = rr;
-        }
       }
     }
   }
@@ -687,6 +2770,162 @@ async function getManagerOverrideCommission({
       : matchedRange.manager_commission_value;
   }
   return baseVal;
+}
+
+/**
+ * personal payscale commission => check date ranges
+ */
+async function getPersonalCommission({
+  personalPayscaleId,
+  planId,
+  isUpgrade,
+  submissionDate,
+  supabase,
+}) {
+  if (!personalPayscaleId || !planId) return 0;
+
+  const { data: dateRanges } = await supabase
+    .from("personal_payscale_date_ranges")
+    .select("*, personal_payscale_date_range_plan_commissions(*)")
+    .eq("personal_payscale_id", personalPayscaleId);
+
+  if (!dateRanges || dateRanges.length === 0) {
+    // fallback to base plan commission
+    const { data: baseComm } = await supabase
+      .from("personal_payscale_plan_commissions")
+      .select("*")
+      .eq("personal_payscale_id", personalPayscaleId)
+      .eq("plan_id", planId)
+      .single();
+    if (!baseComm) return 0;
+    return isUpgrade
+      ? baseComm.rep_upgrade_commission_value
+      : baseComm.rep_commission_value;
+  }
+
+  const subDate = submissionDate instanceof Date ? submissionDate : parseUSDate(submissionDate);
+  if (!subDate) {
+    // fallback if no valid date
+    const { data: baseComm } = await supabase
+      .from("personal_payscale_plan_commissions")
+      .select("*")
+      .eq("personal_payscale_id", personalPayscaleId)
+      .eq("plan_id", planId)
+      .single();
+    if (!baseComm) return 0;
+    return isUpgrade
+      ? baseComm.rep_upgrade_commission_value
+      : baseComm.rep_commission_value;
+  }
+
+  let matchedRange = null;
+  for (const dr of dateRanges) {
+    const start = new Date(dr.start_date);
+    const end = dr.end_date ? new Date(dr.end_date) : null;
+    if (subDate >= start && (!end || subDate <= end)) {
+      if (!matchedRange) matchedRange = dr;
+      else if (new Date(dr.start_date) > new Date(matchedRange.start_date)) {
+        matchedRange = dr;
+      }
+    }
+  }
+  if (matchedRange) {
+    const pc = matchedRange.personal_payscale_date_range_plan_commissions.find(
+      (x) => x.plan_id === planId
+    );
+    if (!pc) return 0;
+    return isUpgrade ? pc.rep_upgrade_commission_value : pc.rep_commission_value;
+  }
+
+  // no match => base
+  const { data: fallbackComm } = await supabase
+    .from("personal_payscale_plan_commissions")
+    .select("*")
+    .eq("personal_payscale_id", personalPayscaleId)
+    .eq("plan_id", planId)
+    .single();
+  if (!fallbackComm) return 0;
+  return isUpgrade
+    ? fallbackComm.rep_upgrade_commission_value
+    : fallbackComm.rep_commission_value;
+}
+
+/**
+ * manager payscale => check date ranges
+ */
+async function getManagerCommission({
+  managerPayscaleId,
+  planId,
+  isUpgrade,
+  submissionDate,
+  supabase,
+}) {
+  if (!managerPayscaleId || !planId) return 0;
+
+  const { data: dateRanges } = await supabase
+    .from("manager_payscale_date_ranges")
+    .select("*, manager_payscale_date_range_plan_commissions(*)")
+    .eq("manager_payscale_id", managerPayscaleId);
+
+  if (!dateRanges || dateRanges.length === 0) {
+    // fallback to base
+    const { data: baseComm } = await supabase
+      .from("manager_payscale_plan_commissions")
+      .select("*")
+      .eq("manager_payscale_id", managerPayscaleId)
+      .eq("plan_id", planId)
+      .single();
+    if (!baseComm) return 0;
+    return isUpgrade
+      ? baseComm.manager_upgrade_commission_value
+      : baseComm.manager_commission_value;
+  }
+
+  const subDate = submissionDate instanceof Date ? submissionDate : parseUSDate(submissionDate);
+  if (!subDate) {
+    // fallback if no valid date
+    const { data: baseComm } = await supabase
+      .from("manager_payscale_plan_commissions")
+      .select("*")
+      .eq("manager_payscale_id", managerPayscaleId)
+      .eq("plan_id", planId)
+      .single();
+    if (!baseComm) return 0;
+    return isUpgrade
+      ? baseComm.manager_upgrade_commission_value
+      : baseComm.manager_commission_value;
+  }
+
+  let matchedRange = null;
+  for (const dr of dateRanges) {
+    const start = new Date(dr.start_date);
+    const end = dr.end_date ? new Date(dr.end_date) : null;
+    if (subDate >= start && (!end || subDate <= end)) {
+      if (!matchedRange) matchedRange = dr;
+      else if (new Date(dr.start_date) > new Date(matchedRange.start_date)) {
+        matchedRange = dr;
+      }
+    }
+  }
+  if (matchedRange) {
+    const pc = matchedRange.manager_payscale_date_range_plan_commissions.find(
+      (x) => x.plan_id === planId
+    );
+    if (!pc) return 0;
+    return isUpgrade ? pc.manager_upgrade_commission_value : pc.manager_commission_value;
+  }
+
+  // fallback
+  const { data: fallbackComm } = await supabase
+    .from("manager_payscale_plan_commissions")
+    .select("*")
+    .eq("manager_payscale_id", managerPayscaleId)
+    .eq("plan_id", planId)
+    .single();
+  if (!fallbackComm) return 0;
+  return isUpgrade
+    ? fallbackComm.manager_upgrade_commission_value
+    : fallbackComm.manager_commission_value;
 }
 
 export default function NormalFlow({ supabase }) {
@@ -711,123 +2950,11 @@ export default function NormalFlow({ supabase }) {
   const allThreeFilesAreSelected =
     fileNewInstalls && fileWhiteGlove && fileMigrations && report.length === 0;
 
-  async function getPersonalCommission({
-    personalPayscaleId,
-    planId,
-    isUpgrade,
-    submissionDate,
-  }) {
-    const { data: dateRanges } = await supabase
-      .from("personal_payscale_date_ranges")
-      .select("id, start_date, end_date, personal_payscale_date_range_plan_commissions(*)")
-      .eq("personal_payscale_id", personalPayscaleId);
-
-    if (!dateRanges || dateRanges.length === 0) {
-      const { data: baseComm } = await supabase
-        .from("personal_payscale_plan_commissions")
-        .select("*")
-        .eq("personal_payscale_id", personalPayscaleId)
-        .eq("plan_id", planId)
-        .single();
-      if (!baseComm) return 0;
-      return isUpgrade
-        ? baseComm.rep_upgrade_commission_value
-        : baseComm.rep_commission_value;
-    }
-
-    const subDateObj = new Date(submissionDate);
-    let matchedRange = null;
-    for (const dr of dateRanges) {
-      const start = new Date(dr.start_date);
-      const end = dr.end_date ? new Date(dr.end_date) : null;
-      if (subDateObj >= start && (!end || subDateObj <= end)) {
-        if (!matchedRange) {
-          matchedRange = dr;
-        } else if (new Date(dr.start_date) > new Date(matchedRange.start_date)) {
-          matchedRange = dr;
-        }
-      }
-    }
-    if (matchedRange) {
-      const pc = matchedRange.personal_payscale_date_range_plan_commissions.find(
-        (x) => x.plan_id === planId
-      );
-      if (!pc) return 0;
-      return isUpgrade ? pc.rep_upgrade_commission_value : pc.rep_commission_value;
-    } else {
-      const { data: baseComm } = await supabase
-        .from("personal_payscale_plan_commissions")
-        .select("*")
-        .eq("personal_payscale_id", personalPayscaleId)
-        .eq("plan_id", planId)
-        .single();
-      if (!baseComm) return 0;
-      return isUpgrade
-        ? baseComm.rep_upgrade_commission_value
-        : baseComm.rep_commission_value;
-    }
-  }
-
-  async function getManagerCommission({
-    managerPayscaleId,
-    planId,
-    isUpgrade,
-    submissionDate,
-  }) {
-    const { data: dateRanges } = await supabase
-      .from("manager_payscale_date_ranges")
-      .select("id, start_date, end_date, manager_payscale_date_range_plan_commissions(*)")
-      .eq("manager_payscale_id", managerPayscaleId);
-
-    if (!dateRanges || dateRanges.length === 0) {
-      const { data: baseComm } = await supabase
-        .from("manager_payscale_plan_commissions")
-        .select("*")
-        .eq("manager_payscale_id", managerPayscaleId)
-        .eq("plan_id", planId)
-        .single();
-      if (!baseComm) return 0;
-      return isUpgrade
-        ? baseComm.manager_upgrade_commission_value
-        : baseComm.manager_commission_value;
-    }
-
-    const subDateObj = new Date(submissionDate);
-    let matchedRange = null;
-    for (const dr of dateRanges) {
-      const start = new Date(dr.start_date);
-      const end = dr.end_date ? new Date(dr.end_date) : null;
-      if (subDateObj >= start && (!end || subDateObj <= end)) {
-        if (!matchedRange) {
-          matchedRange = dr;
-        } else if (new Date(dr.start_date) > new Date(matchedRange.start_date)) {
-          matchedRange = dr;
-        }
-      }
-    }
-
-    if (matchedRange) {
-      const pc = matchedRange.manager_payscale_date_range_plan_commissions.find(
-        (x) => x.plan_id === planId
-      );
-      if (!pc) return 0;
-      return isUpgrade
-        ? pc.manager_upgrade_commission_value
-        : pc.manager_commission_value;
-    } else {
-      const { data: baseComm } = await supabase
-        .from("manager_payscale_plan_commissions")
-        .select("*")
-        .eq("manager_payscale_id", managerPayscaleId)
-        .eq("plan_id", planId)
-        .single();
-      if (!baseComm) return 0;
-      return isUpgrade
-        ? baseComm.manager_upgrade_commission_value
-        : baseComm.manager_commission_value;
-    }
-  }
-
+  /**
+   * Parse the 3 CSVs (new installs, white glove, migrations).
+   * Insert only the matched White Glove rows.
+   * Then do the rest of the logic for plans, agents, and final payroll report.
+   */
   async function parseAllNormalFiles() {
     if (!fileNewInstalls || !fileWhiteGlove || !fileMigrations) {
       alert("Please select New Installs, White Glove, AND Migrations CSVs.");
@@ -849,36 +2976,64 @@ export default function NormalFlow({ supabase }) {
                   const whiteGloveRows = resWg.data || [];
                   const migrationsRows = resMig.data || [];
 
-                  await upsertPlansFromCSV(newInstallsRows, whiteGloveRows);
-                  await upsertPlansFromCSV(migrationsRows, whiteGloveRows);
-
-                  const wgMap = {};
+                  // Build a map of all white glove by order number
+                  const wgMapAll = {};
                   whiteGloveRows.forEach((row) => {
                     if (row["Order Number"]) {
-                      wgMap[row["Order Number"].trim()] = row;
+                      wgMapAll[row["Order Number"].trim()] = row;
                     }
                   });
 
+                  // Match new installs
                   const matchedNewInstalls = newInstallsRows
-                    .filter((r) => r["Order Id"] && wgMap[r["Order Id"].trim()])
+                    .filter(
+                      (r) =>
+                        r["Order Id"] &&
+                        wgMapAll[r["Order Id"].trim()] &&
+                        wgMapAll[r["Order Id"].trim()] !== undefined
+                    )
                     .map((r) => ({
                       ...r,
-                      matchedWhiteGlove: wgMap[r["Order Id"].trim()],
+                      matchedWhiteGlove: wgMapAll[r["Order Id"].trim()],
                       isUpgrade: false,
                     }));
 
+                  // Match migrations
                   const matchedMigrations = migrationsRows
-                    .filter((r) => r["Order Id"] && wgMap[r["Order Id"].trim()])
+                    .filter(
+                      (r) =>
+                        r["Order Id"] &&
+                        wgMapAll[r["Order Id"].trim()] &&
+                        wgMapAll[r["Order Id"].trim()] !== undefined
+                    )
                     .map((r) => ({
                       ...r,
-                      matchedWhiteGlove: wgMap[r["Order Id"].trim()],
+                      matchedWhiteGlove: wgMapAll[r["Order Id"].trim()],
                       isUpgrade: true,
                     }));
 
+                  // Combine both sets
                   const allMatched = [...matchedNewInstalls, ...matchedMigrations];
 
+                  // Unique White Glove rows from the matched sets
+                  // so we only insert the matched WGs
+                  const matchedWgSet = new Set();
+                  for (const row of allMatched) {
+                    matchedWgSet.add(row.matchedWhiteGlove);
+                  }
+                  const matchedWgRows = Array.from(matchedWgSet);
+
+                  // Now upsert only the matched White Glove rows
+                  await upsertMatchedWhiteGloveEntries(supabase, matchedWgRows);
+
+                  // Then upsert plans
+                  await upsertPlansFromCSV(newInstallsRows, matchedWgRows);
+                  await upsertPlansFromCSV(migrationsRows, matchedWgRows);
+
+                  // Then upsert agents
                   await upsertAgentsFromMatches(allMatched);
 
+                  // Finally, generate the normal report
                   await generateNormalReport(allMatched);
                 } catch (err) {
                   console.error("Error processing normal/migrations files:", err);
@@ -894,8 +3049,13 @@ export default function NormalFlow({ supabase }) {
     });
   }
 
-  async function upsertPlansFromCSV(csvRows, whiteGloveRows) {
+  /**
+   * Insert or update plan names from CSV rows + matched White Glove
+   */
+  async function upsertPlansFromCSV(csvRows, matchedWgRows) {
     const planMap = {};
+
+    // from new installs / migrations
     for (const row of csvRows) {
       const planName = row["Plan Name"]?.trim();
       const payoutStr = row["Payout"]?.replace("$", "").replace(",", "");
@@ -906,11 +3066,15 @@ export default function NormalFlow({ supabase }) {
         }
       }
     }
+
+    // from matched White Glove
     const wgPlanSet = new Set();
-    for (const row of whiteGloveRows) {
+    for (const row of matchedWgRows) {
       const speed = row["Internet Speed"]?.trim();
       if (speed) wgPlanSet.add(speed);
     }
+
+    // Upsert discovered plan names
     for (const planName of Object.keys(planMap)) {
       await supabase
         .from("plans")
@@ -918,15 +3082,18 @@ export default function NormalFlow({ supabase }) {
           onConflict: "name",
         });
     }
-    for (const planName of wgPlanSet) {
+    for (const wgPlanName of wgPlanSet) {
       await supabase
         .from("plans")
-        .upsert([{ name: planName, commission_amount: 0 }], {
+        .upsert([{ name: wgPlanName, commission_amount: 0 }], {
           onConflict: "name",
         });
     }
   }
 
+  /**
+   * Insert or update agents from matched new installs + migrations
+   */
   async function upsertAgentsFromMatches(matchedRows) {
     const agentsMap = {};
     for (const row of matchedRows) {
@@ -947,23 +3114,31 @@ export default function NormalFlow({ supabase }) {
     }
   }
 
+  /**
+   * Generate the final normal report
+   */
   async function generateNormalReport(matchedRows) {
     const { data: agents } = await supabase.from("agents").select("*");
     const { data: agentManagers } = await supabase.from("agent_managers").select("*");
     const { data: plans } = await supabase.from("plans").select("*");
     const { data: wgeData } = await supabase.from("white_glove_entries").select("*");
 
+    // personal payscales
     const personalPsById = {};
-    const { data: personalPayscales } = await supabase.from("personal_payscales").select("*");
+    const { data: personalPayscales } = await supabase
+      .from("personal_payscales")
+      .select("*");
     (personalPayscales || []).forEach((p) => {
       personalPsById[p.id] = p;
     });
 
+    // manager for agent
     const managerForAgent = {};
     (agentManagers || []).forEach((am) => {
       managerForAgent[am.agent_id] = am.manager_id;
     });
 
+    // wgeByOrder for reference
     const wgeByOrder = {};
     (wgeData || []).forEach((w) => {
       if (w.order_number) {
@@ -971,6 +3146,7 @@ export default function NormalFlow({ supabase }) {
       }
     });
 
+    // init totals
     const totals = {};
     (agents || []).forEach((a) => {
       let up = null,
@@ -994,25 +3170,31 @@ export default function NormalFlow({ supabase }) {
     for (const row of matchedRows) {
       const wg = row.matchedWhiteGlove;
       if (!wg) continue;
-
       const agentInfo = wg["Agent Seller Information"]?.trim();
       const speed = wg["Internet Speed"]?.trim();
       if (!agentInfo || !speed) continue;
 
+      // find agent
       const agent = (agents || []).find(
         (a) => a.identifier && a.identifier.trim() === agentInfo
       );
       if (!agent) continue;
 
+      // find plan
       const plan = (plans || []).find((p) => p.name && p.name.trim() === speed);
       if (!plan) continue;
 
+      // is upgrade?
       const isUpgrade = row.isUpgrade === true;
 
-      const wgeRow = wgeByOrder[wg["Order Number"]?.trim()] || null;
-      const submissionDate = wgeRow?.order_submission_date || null;
+      // parse "Order Submission Date"
+      let submissionDate = null;
+      const wgeRow = wgeByOrder[wg["Order Number"]?.trim()];
+      if (wgeRow?.order_submission_date) {
+        submissionDate = wgeRow.order_submission_date; // already stored as a date in DB
+      }
 
-      // 1) personal
+      // personal
       let personalVal = 0;
       if (agent.personal_payscale_id) {
         personalVal = await getPersonalCommission({
@@ -1020,16 +3202,17 @@ export default function NormalFlow({ supabase }) {
           planId: plan.id,
           isUpgrade,
           submissionDate,
+          supabase,
         });
         totals[agent.id].accounts++;
         totals[agent.id].personalTotal += personalVal;
       }
 
-      // 2) manager
+      // manager
       let managerVal = 0;
       const mgrId = managerForAgent[agent.id];
       if (mgrId) {
-        // first check override (plan-based)
+        // override
         const overrideVal = await getManagerOverrideCommission({
           supabase,
           managerId: mgrId,
@@ -1041,7 +3224,7 @@ export default function NormalFlow({ supabase }) {
         if (overrideVal !== null) {
           managerVal = overrideVal;
         } else {
-          // fallback to manager's plan-based payscale
+          // fallback to manager's payscale
           const { data: managerAgent } = await supabase
             .from("agents")
             .select("*")
@@ -1053,12 +3236,14 @@ export default function NormalFlow({ supabase }) {
               planId: plan.id,
               isUpgrade,
               submissionDate,
+              supabase,
             });
           }
         }
         totals[mgrId].managerTotal += managerVal;
       }
 
+      // record detail
       totals[agent.id].details.push({
         white_glove_entry_id: wgeRow?.id,
         personal_commission: personalVal,
@@ -1067,7 +3252,7 @@ export default function NormalFlow({ supabase }) {
     }
 
     const finalReport = Object.entries(totals)
-      .filter(([_, data]) => data.accounts > 0)
+      .filter(([_, data]) => data.accounts > 0 || data.managerTotal > 0)
       .map(([agentId, data]) => {
         const personalTotal = data.personalTotal;
         const managerTotal = data.managerTotal;
@@ -1096,8 +3281,8 @@ export default function NormalFlow({ supabase }) {
       });
 
     const detailMap = {};
-    for (const line of finalReport) {
-      detailMap[line.agentId] = line.details;
+    for (const item of finalReport) {
+      detailMap[item.agentId] = item.details;
     }
     setReport(finalReport);
     setReportDetails(detailMap);
@@ -2461,6 +4646,7 @@ export default function EditAgentModal({
   });
 
   const [searchVal, setSearchVal] = useState("");
+  const [fidiumSearch, setFidiumSearch] = useState("");
 
   // Agents that can be assigned to this manager
   const assignable = allAgents.filter(
@@ -2473,8 +4659,6 @@ export default function EditAgentModal({
           .includes(searchVal.toLowerCase())
       )
     : assignable;
-
-  const [fidiumSearch, setFidiumSearch] = useState("");
 
   async function updateAgent() {
     await supabase
@@ -2496,11 +4680,11 @@ export default function EditAgentModal({
     // Reassign agent_managers
     await supabase.from("agent_managers").delete().eq("manager_id", form.id);
     if (form.is_manager && form.assignedAgents.length > 0) {
-      const arr = form.assignedAgents.map((aid) => ({
+      const rows = form.assignedAgents.map((aid) => ({
         agent_id: aid,
         manager_id: form.id,
       }));
-      await supabase.from("agent_managers").insert(arr);
+      await supabase.from("agent_managers").insert(rows);
     }
     onClose();
   }
@@ -2534,7 +4718,7 @@ export default function EditAgentModal({
               setFidiumSearch(e.target.value);
             }}
           />
-          {/** Searching Fidium Salesmen */}
+          {/* Fidium Salesmen suggestions */}
           {fidiumSearch && (
             <div className="mt-2 border p-2 rounded max-h-48 overflow-auto bg-white">
               {fidiumSalesmen
@@ -2574,13 +4758,11 @@ export default function EditAgentModal({
             }
           >
             <option value="">(None)</option>
-            {personal_payscale_id =>
-              personalPayscales.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))
-            }
+            {personalPayscales.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
           </Select>
         </Field>
 
@@ -2589,7 +4771,9 @@ export default function EditAgentModal({
             <Label>Manager Payscale</Label>
             <Select
               value={form.manager_payscale_id}
-              onChange={(e) => setForm({ ...form, manager_payscale_id: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, manager_payscale_id: e.target.value })
+              }
             >
               <option value="">(None)</option>
               {managerPayscales.map((p) => (
@@ -3489,240 +5673,440 @@ export default function EditPersonalPayscaleModal({ payscale, plans, supabase, o
 // app/protected/payscales/tabs/modals/FidiumManagerOverridesModal.jsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import React, { useState, useEffect } from "react";
+import { Dialog } from "@/components/dialog";
 import { Field, Label } from "@/components/fieldset";
-import { Select } from "@/components/select";
 import { Input } from "@/components/input";
 import { Button } from "@/components/button";
-import DateRangeManagerFidium from "./DateRangeManagerFidium";
 
 /**
- * Fidium Manager Overrides using "manager_overrides" table with is_fidium=true.
+ * FidiumManagerOverridesModal
  *
- * Props:
- *   - payscaleName (string)
- *   - managerList: array of manager objects
- *   - assignedAgentsMap: function that returns array of agents for a manager
- *   - fidiumPlans: array of {id, name}
- *   - supabase
+ * For each agent managed by a manager on this Fidium manager payscale:
+ * - We unify existing date-range rows that share start_date/end_date into a single `globalRanges` object.
+ * - The user can only add/edit date ranges if there's at least one plan override row (dbId) for that manager->agent.
+ * - On save, we remove old date-range rows and re-insert them in one pass.
  */
 export default function FidiumManagerOverridesModal({
-  payscaleName = "Fidium Payscale",
-  managerList = [],
-  assignedAgentsMap = () => [],
-  fidiumPlans = [],
+  payscale,
+  agents,
+  agentManagers,
+  fidiumPlans,
   supabase,
   onClose,
 }) {
-  const initialManagerId = managerList.length > 0 ? managerList[0].id : "";
-  const [managerId, setManagerId] = useState(initialManagerId);
+  const [managedAgents, setManagedAgents] = useState([]);
 
-  const [overridesByAgent, setOverridesByAgent] = useState({});
+  /**
+   * overrideData shape:
+   *   {
+   *     [managerId]: {
+   *       [agentId]: {
+   *         plans: {
+   *           [planId]: { base: string, dbId?: string }
+   *         },
+   *         globalRanges: [
+   *           {
+   *             id: string,           // local ID for React
+   *             start_date: string,
+   *             end_date: string,
+   *             rowIds: array<string>, // existing DB row IDs
+   *             planValues: {
+   *               [planId]: { base: string }
+   *             }
+   *           }
+   *         ]
+   *       }
+   *     }
+   *   }
+   */
+  const [overrideData, setOverrideData] = useState({});
 
   useEffect(() => {
-    if (managerId) {
-      fetchOverrides(managerId);
-    } else {
-      setOverridesByAgent({});
-    }
+    const managerIds = agents
+      .filter((a) => a.fidium_manager_payscale_id === payscale.id)
+      .map((a) => a.id);
+
+    const relevantLinks = agentManagers.filter((am) =>
+      managerIds.includes(am.manager_id)
+    );
+    const relevantAgentIds = [...new Set(relevantLinks.map((am) => am.agent_id))];
+    setManagedAgents(agents.filter((a) => relevantAgentIds.includes(a.id)));
+
+    loadExistingOverrides(managerIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [managerId]);
+  }, []);
 
-  async function fetchOverrides(mId) {
-    const { data, error } = await supabase
-      .from("manager_overrides")
-      .select("*")
-      .eq("manager_id", mId)
-      .eq("is_fidium", true);
-
-    if (error) {
-      console.error("Error fetching Fidium overrides:", error);
-      setOverridesByAgent({});
+  async function loadExistingOverrides(managerIds) {
+    if (!managerIds.length) {
+      setOverrideData({});
       return;
     }
-    const map = {};
-    (data || []).forEach((row) => {
-      map[row.agent_id] = row;
-    });
-    setOverridesByAgent(map);
-  }
 
-  function getAssignedAgents(mId) {
-    const result = assignedAgentsMap(mId);
-    return Array.isArray(result) ? result : [];
-  }
+    const { data: overrides } = await supabase
+      .from("fidium_manager_agent_commissions")
+      .select("*, fidium_manager_agent_commission_date_ranges(*)")
+      .in("manager_id", managerIds);
 
-  function getOrCreateOverrideRow(agentId) {
-    const existing = overridesByAgent[agentId];
-    if (!existing) {
-      return {
-        id: null,
-        manager_id: managerId,
-        agent_id: agentId,
-        is_fidium: true,
-        plan_overrides: {},
-        date_ranges: [],
+    const initData = {};
+
+    (overrides || []).forEach((ov) => {
+      const mId = ov.manager_id;
+      const aId = ov.agent_id;
+      const pId = ov.fidium_plan_id;
+
+      if (!initData[mId]) initData[mId] = {};
+      if (!initData[mId][aId]) {
+        initData[mId][aId] = {
+          plans: {},
+          globalRanges: [],
+        };
+      }
+
+      // per-plan base override
+      initData[mId][aId].plans[pId] = {
+        base: ov.manager_commission_value?.toString() || "0",
+        dbId: ov.id,
       };
+
+      // unify date ranges by (start_date, end_date)
+      (ov.fidium_manager_agent_commission_date_ranges || []).forEach((dr) => {
+        const s = dr.start_date || "";
+        const e = dr.end_date || "";
+        const block = initData[mId][aId];
+        let rangeObj = block.globalRanges.find(
+          (x) => x.start_date === s && x.end_date === e
+        );
+        if (!rangeObj) {
+          // create new date range block
+          const planObj = {};
+          for (const fp of fidiumPlans) {
+            planObj[fp.id] = { base: "0" };
+          }
+          rangeObj = {
+            id: "db-" + Math.random().toString(36).slice(2),
+            start_date: s,
+            end_date: e,
+            rowIds: [],
+            planValues: planObj,
+          };
+          block.globalRanges.push(rangeObj);
+        }
+        rangeObj.rowIds.push(dr.id);
+        // set the plan's base value
+        rangeObj.planValues[pId].base =
+          dr.manager_commission_value?.toString() || "0";
+      });
+    });
+
+    setOverrideData(initData);
+  }
+
+  // per-plan base override
+  function getPlanBase(mId, aId, pId) {
+    return overrideData[mId]?.[aId]?.plans[pId]?.base || "0";
+  }
+  function setPlanBase(mId, aId, pId, val) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      if (!next[mId]) next[mId] = {};
+      if (!next[mId][aId]) {
+        next[mId][aId] = { plans: {}, globalRanges: [] };
+      }
+      if (!next[mId][aId].plans[pId]) {
+        next[mId][aId].plans[pId] = { base: "0" };
+      }
+      next[mId][aId].plans[pId].base = val;
+      return next;
+    });
+  }
+
+  // agent-level date ranges
+  function addAgentDateRange(mId, aId) {
+    // if no plan has a dbId, show a message or do nothing
+    const block = overrideData[mId]?.[aId];
+    if (!block) return;
+    const hasAnyDbId = Object.values(block.plans).some((p) => p.dbId);
+    if (!hasAnyDbId) {
+      alert(
+        "You must set a base override (and save) for at least one plan before creating date ranges."
+      );
+      return;
     }
-    return existing;
-  }
 
-  function setBaseVal(agentId, planId, newVal) {
-    setOverridesByAgent((prev) => {
-      const oldRow = prev[agentId] || {
-        id: null,
-        manager_id: managerId,
-        agent_id,
-        is_fidium: true,
-        plan_overrides: {},
-        date_ranges: [],
-      };
-      const oldPlan = oldRow.plan_overrides[planId] || { base: "0" };
-      return {
-        ...prev,
-        [agentId]: {
-          ...oldRow,
-          plan_overrides: {
-            ...oldRow.plan_overrides,
-            [planId]: {
-              ...oldPlan,
-              base: newVal,
-            },
-          },
-        },
-      };
+    // otherwise proceed
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const planObj = {};
+      for (const fp of fidiumPlans) {
+        planObj[fp.id] = { base: "0" };
+      }
+      next[mId][aId].globalRanges.push({
+        id: "local-" + Math.random().toString(36).slice(2),
+        start_date: "",
+        end_date: "",
+        rowIds: [],
+        planValues: planObj,
+      });
+      return next;
     });
   }
 
-  function getAgentDateRanges(agentId) {
-    return getOrCreateOverrideRow(agentId).date_ranges || [];
+  function setDateRangeVal(mId, aId, rangeId, field, value) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const ranges = next[mId][aId].globalRanges;
+      const idx = ranges.findIndex((r) => r.id === rangeId);
+      if (idx >= 0) {
+        ranges[idx][field] = value;
+      }
+      return next;
+    });
   }
 
-  function setAgentDateRanges(agentId, newRanges) {
-    setOverridesByAgent((prev) => {
-      const oldRow = getOrCreateOverrideRow(agentId);
-      return {
-        ...prev,
-        [agentId]: {
-          ...oldRow,
-          date_ranges: newRanges,
-        },
-      };
+  function setDateRangePlanVal(mId, aId, rangeId, planId, val) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const ranges = next[mId][aId].globalRanges;
+      const idx = ranges.findIndex((r) => r.id === rangeId);
+      if (idx >= 0) {
+        ranges[idx].planValues[planId].base = val;
+      }
+      return next;
     });
   }
 
   async function handleSave() {
-    // gather all agent rows
-    const assignedAgents = getAssignedAgents(managerId);
-    const allAgentIds = new Set([...assignedAgents.map((a) => a.id), ...Object.keys(overridesByAgent)]);
+    // For each manager->agent, upsert base for each plan => rowId
+    // Then remove old date range rows, then re-insert new from globalRanges
+    for (const mId in overrideData) {
+      for (const aId in overrideData[mId]) {
+        const block = overrideData[mId][aId];
 
-    const rowsToUpsert = [];
-    for (const agentId of allAgentIds) {
-      const rowObj = getOrCreateOverrideRow(agentId);
-      rowsToUpsert.push({
-        id: rowObj.id || undefined,
-        manager_id: rowObj.manager_id,
-        agent_id: rowObj.agent_id,
-        is_fidium: true,
-        plan_overrides: rowObj.plan_overrides || {},
-        date_ranges: rowObj.date_ranges || [],
-      });
-    }
+        // Upsert base for each plan
+        for (const pId in block.plans) {
+          const baseVal = parseFloat(block.plans[pId].base) || 0;
+          let rowId = block.plans[pId].dbId;
 
-    for (const item of rowsToUpsert) {
-      const { error } = await supabase.from("manager_overrides").upsert(item).select("*").single();
-      if (error) {
-        console.error("Error upserting Fidium override row:", error);
+          if (!rowId) {
+            // Insert
+            const { data: inserted } = await supabase
+              .from("fidium_manager_agent_commissions")
+              .insert([
+                {
+                  manager_id: mId,
+                  agent_id: aId,
+                  fidium_plan_id: pId,
+                  manager_commission_value: baseVal,
+                },
+              ])
+              .select("*")
+              .single();
+            if (inserted) {
+              rowId = inserted.id;
+              block.plans[pId].dbId = rowId;
+            }
+          } else {
+            // Update
+            await supabase
+              .from("fidium_manager_agent_commissions")
+              .update({ manager_commission_value: baseVal })
+              .eq("id", rowId);
+          }
+
+          // remove old date range rows and re-insert
+          if (rowId) {
+            await supabase
+              .from("fidium_manager_agent_commission_date_ranges")
+              .delete()
+              .eq("fidium_manager_agent_commission_id", rowId);
+
+            for (const dr of block.globalRanges) {
+              const st = dr.start_date || null;
+              const ed = dr.end_date || null;
+              const valBase = parseFloat(dr.planValues[pId].base) || 0;
+              await supabase
+                .from("fidium_manager_agent_commission_date_ranges")
+                .insert([
+                  {
+                    fidium_manager_agent_commission_id: rowId,
+                    fidium_plan_id: pId,
+                    start_date: st,
+                    end_date: ed,
+                    manager_commission_value: valBase,
+                  },
+                ]);
+            }
+          }
+        }
       }
     }
-
     onClose();
-  }
-
-  if (managerList.length === 0) {
-    return (
-      <Dialog open onClose={onClose} size="md">
-        <DialogTitle>Fidium Manager Overrides ({payscaleName})</DialogTitle>
-        <DialogBody>No Fidium managers found.</DialogBody>
-        <DialogActions>
-          <Button onClick={onClose}>Close</Button>
-        </DialogActions>
-      </Dialog>
-    );
   }
 
   return (
     <Dialog open onClose={onClose} size="xl">
-      <DialogTitle>Fidium Manager Overrides ({payscaleName})</DialogTitle>
-      <DialogBody>
-        <Field className="mb-4">
-          <Label>Select Manager</Label>
-          <Select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
-            {managerList.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name || m.identifier}
-              </option>
-            ))}
-          </Select>
-        </Field>
+      <div className="flex flex-col h-[80vh]">
+        <div className="px-4 py-2 border-b">
+          <h2 className="text-xl font-bold">
+            Fidium Manager Overrides: {payscale.name}
+          </h2>
+        </div>
 
-        <hr className="my-4" />
+        <div className="overflow-auto p-4 flex-1">
+          {managedAgents.length === 0 ? (
+            <div>No agents assigned to managers with this Fidium manager payscale.</div>
+          ) : (
+            managedAgents.map((agent) => {
+              const managerLinks = agentManagers.filter(
+                (am) =>
+                  am.agent_id === agent.id &&
+                  agents.find((x) => x.id === am.manager_id)
+                    ?.fidium_manager_payscale_id === payscale.id
+              );
+              if (!managerLinks.length) return null;
 
-        {getAssignedAgents(managerId).length === 0 && (
-          <div>This manager has no assigned agents.</div>
-        )}
-        {getAssignedAgents(managerId).map((agt) => {
-          const row = getOrCreateOverrideRow(agt.id);
-          return (
-            <div key={agt.id} className="mb-6 border-b pb-4">
-              <h3 className="text-lg font-semibold mb-2">
-                Agent: {agt.name || agt.identifier}
-              </h3>
+              return (
+                <div key={agent.id} className="border p-4 mb-4 rounded bg-gray-50">
+                  <h3 className="font-bold text-lg mb-2">
+                    Agent: {agent.name || agent.identifier}
+                  </h3>
 
-              <p className="text-sm font-medium text-gray-600 mb-2">
-                Base Overrides (per Fidium plan):
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {fidiumPlans.map((fp) => {
-                  const planObj = row.plan_overrides?.[fp.id] || { base: "0" };
-                  return (
-                    <div key={fp.id} className="border p-2 rounded bg-white text-sm">
-                      <div className="font-medium mb-1">{fp.name}</div>
-                      <Field className="flex items-center">
-                        <Label className="w-1/3 text-xs">Base($)</Label>
-                        <Input
-                          type="number"
-                          value={planObj.base}
-                          onChange={(e) =>
-                            setBaseVal(agt.id, fp.id, e.target.value)
-                          }
-                        />
-                      </Field>
-                    </div>
-                  );
-                })}
-              </div>
+                  {managerLinks.map((ml) => {
+                    const manager = agents.find((a) => a.id === ml.manager_id);
+                    if (!manager) return null;
 
-              <p className="text-sm font-medium text-gray-600 mt-4 mb-2">
-                Date Range Overrides
-              </p>
-              <DateRangeManagerFidium
-                fidiumPlans={fidiumPlans}
-                dateRanges={row.date_ranges}
-                setDateRanges={(newRanges) => setAgentDateRanges(agt.id, newRanges)}
-                label="Override Commission Amounts by Date"
-              />
-            </div>
-          );
-        })}
-      </DialogBody>
-      <DialogActions>
-        <Button plain onClick={onClose}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave}>Save All</Button>
-      </DialogActions>
+                    return (
+                      <div key={ml.id} className="mb-4 border-l pl-4">
+                        <p className="text-gray-600 mb-2">
+                          Manager: {manager.name || manager.identifier}
+                        </p>
+
+                        {/* Per-plan base overrides */}
+                        <div className="space-y-3">
+                          {fidiumPlans.map((fp) => {
+                            const baseVal = getPlanBase(manager.id, agent.id, fp.id);
+                            return (
+                              <div key={fp.id} className="flex items-center gap-4">
+                                <span className="w-40 font-semibold">{fp.name}</span>
+                                <Field className="flex items-center">
+                                  <Label className="text-xs mr-1">Base($)</Label>
+                                  <Input
+                                    type="number"
+                                    className="w-20"
+                                    value={baseVal}
+                                    onChange={(e) =>
+                                      setPlanBase(manager.id, agent.id, fp.id, e.target.value)
+                                    }
+                                  />
+                                </Field>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Agent-wide date ranges (for all plans) */}
+                        <div className="mt-4 p-2">
+                          <div className="font-semibold mb-2">Global Date Ranges</div>
+
+                          {overrideData[manager.id]?.[agent.id]?.globalRanges?.map((dr) => (
+                            <div
+                              key={dr.id}
+                              className="border p-2 rounded mb-2 space-y-2"
+                            >
+                              <div className="flex gap-4">
+                                <Field>
+                                  <Label className="text-xs">Start Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={dr.start_date}
+                                    onChange={(e) =>
+                                      setDateRangeVal(
+                                        manager.id,
+                                        agent.id,
+                                        dr.id,
+                                        "start_date",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                                <Field>
+                                  <Label className="text-xs">End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={dr.end_date}
+                                    onChange={(e) =>
+                                      setDateRangeVal(
+                                        manager.id,
+                                        agent.id,
+                                        dr.id,
+                                        "end_date",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                              </div>
+
+                              {/* All fidium plans inside this date range */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                {fidiumPlans.map((fp) => {
+                                  const rangeBaseVal =
+                                    dr.planValues[fp.id]?.base || "0";
+                                  return (
+                                    <div
+                                      key={fp.id}
+                                      className="border p-2 rounded text-sm"
+                                    >
+                                      <div className="font-medium mb-1">{fp.name}</div>
+                                      <Field className="flex items-center">
+                                        <Label className="w-1/3 text-xs">Base($)</Label>
+                                        <Input
+                                          type="number"
+                                          value={rangeBaseVal}
+                                          onChange={(e) =>
+                                            setDateRangePlanVal(
+                                              manager.id,
+                                              agent.id,
+                                              dr.id,
+                                              fp.id,
+                                              e.target.value
+                                            )
+                                          }
+                                        />
+                                      </Field>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => addAgentDateRange(manager.id, agent.id)}
+                          >
+                            + Add Date Range
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="border-t p-4 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>Save Overrides</Button>
+        </div>
+      </div>
     </Dialog>
   );
 }
@@ -3732,256 +6116,500 @@ export default function FidiumManagerOverridesModal({
 // app/protected/payscales/tabs/modals/ManagerOverridesModal.jsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import React, { useState, useEffect } from "react";
+import { Dialog } from "@/components/dialog";
 import { Field, Label } from "@/components/fieldset";
-import { Select } from "@/components/select";
 import { Input } from "@/components/input";
 import { Button } from "@/components/button";
-import DateRangeManager from "./DateRangeManager";
 
 /**
- * Normal Manager Overrides using the new "manager_overrides" table with is_fidium=false.
+ * ManagerOverridesModal
  *
- * - managerList: array of manager objects => must not be undefined.
- *   We'll default to an empty array if not provided.
- * - assignedAgentsMap: function that returns an array of agents for a given managerId. Also default to [] if it returns nothing.
- * - plans: array of plan objects => default to [] if not provided.
- * - supabase instance
+ * For each agent managed by a manager on this normal manager payscale:
+ * - We unify existing date-range rows that share start_date/end_date into a single `globalRanges` object.
+ * - The user can only add/edit date ranges if there's at least one plan override row (dbId) for that manager->agent.
+ * - On save, we remove old date-range rows and re-insert them in one pass.
  */
 export default function ManagerOverridesModal({
-  payscaleName = "My Payscale",
-  managerList = [],
-  assignedAgentsMap = () => [],
-  plans = [],
+  payscale,
+  agents,
+  agentManagers,
+  plans,
   supabase,
   onClose,
 }) {
-  // If managerList is empty, set managerId = "" to avoid TypeError
-  const initialManagerId = managerList.length > 0 ? managerList[0].id : "";
-  const [managerId, setManagerId] = useState(initialManagerId);
+  const [managedAgents, setManagedAgents] = useState([]);
 
-  // { [agentId]: { id, manager_id, agent_id, plan_overrides, date_ranges } }
-  const [overridesByAgent, setOverridesByAgent] = useState({});
+  /**
+   * overrideData shape:
+   *   {
+   *     [managerId]: {
+   *       [agentId]: {
+   *         plans: {
+   *           [planId]: { base: string, upgrade: string, dbId?: string }
+   *         },
+   *         globalRanges: [
+   *           {
+   *             id: string,
+   *             start_date: string,
+   *             end_date: string,
+   *             rowIds: array<string>,
+   *             planValues: {
+   *               [planId]: { base: string, upgrade: string }
+   *             }
+   *           }
+   *         ]
+   *       }
+   *     }
+   *   }
+   */
+  const [overrideData, setOverrideData] = useState({});
 
   useEffect(() => {
-    if (managerId) {
-      fetchOverrides(managerId);
-    } else {
-      setOverridesByAgent({});
-    }
+    const managerIds = agents
+      .filter((a) => a.manager_payscale_id === payscale.id)
+      .map((a) => a.id);
+
+    const relevantLinks = agentManagers.filter((am) =>
+      managerIds.includes(am.manager_id)
+    );
+    const relevantAgentIds = [...new Set(relevantLinks.map((am) => am.agent_id))];
+    setManagedAgents(agents.filter((a) => relevantAgentIds.includes(a.id)));
+
+    loadExistingOverrides(managerIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [managerId]);
+  }, []);
 
-  async function fetchOverrides(mId) {
-    const { data, error } = await supabase
-      .from("manager_overrides")
-      .select("*")
-      .eq("manager_id", mId)
-      .eq("is_fidium", false);
-
-    if (error) {
-      console.error("Error fetching overrides", error);
-      setOverridesByAgent({});
+  async function loadExistingOverrides(managerIds) {
+    if (!managerIds.length) {
+      setOverrideData({});
       return;
     }
-    const map = {};
-    (data || []).forEach((row) => {
-      map[row.agent_id] = row;
-    });
-    setOverridesByAgent(map);
-  }
 
-  function getAssignedAgents(mId) {
-    const result = assignedAgentsMap(mId);
-    return Array.isArray(result) ? result : [];
-  }
+    const { data: overrides } = await supabase
+      .from("manager_agent_commissions")
+      .select("*, manager_agent_commission_date_ranges(*)")
+      .in("manager_id", managerIds);
 
-  function getOrCreateOverrideRow(agentId) {
-    const existing = overridesByAgent[agentId];
-    if (!existing) {
-      return {
-        id: null,
-        manager_id: managerId,
-        agent_id: agentId,
-        is_fidium: false,
-        plan_overrides: {},
-        date_ranges: [],
+    const initData = {};
+
+    (overrides || []).forEach((ov) => {
+      const mId = ov.manager_id;
+      const aId = ov.agent_id;
+      const pId = ov.plan_id;
+
+      if (!initData[mId]) initData[mId] = {};
+      if (!initData[mId][aId]) {
+        initData[mId][aId] = {
+          plans: {},
+          globalRanges: [],
+        };
+      }
+
+      // per-plan base/upgrade override
+      initData[mId][aId].plans[pId] = {
+        base: ov.manager_commission_value?.toString() || "0",
+        upgrade: ov.manager_upgrade_commission_value?.toString() || "0",
+        dbId: ov.id,
       };
+
+      // unify date ranges
+      (ov.manager_agent_commission_date_ranges || []).forEach((dr) => {
+        const s = dr.start_date || "";
+        const e = dr.end_date || "";
+        const block = initData[mId][aId];
+        let rangeObj = block.globalRanges.find(
+          (x) => x.start_date === s && x.end_date === e
+        );
+        if (!rangeObj) {
+          // create
+          const planObj = {};
+          for (const pl of plans) {
+            planObj[pl.id] = { base: "0", upgrade: "0" };
+          }
+          rangeObj = {
+            id: "db-" + Math.random().toString(36).slice(2),
+            start_date: s,
+            end_date: e,
+            rowIds: [],
+            planValues: planObj,
+          };
+          block.globalRanges.push(rangeObj);
+        }
+        rangeObj.rowIds.push(dr.id);
+
+        // set plan’s base/upgrade
+        rangeObj.planValues[pId].base =
+          dr.manager_commission_value?.toString() || "0";
+        rangeObj.planValues[pId].upgrade =
+          dr.manager_upgrade_commission_value?.toString() || "0";
+      });
+    });
+
+    setOverrideData(initData);
+  }
+
+  // per-plan outside date ranges
+  function getPlanVal(mId, aId, pId, field) {
+    return overrideData[mId]?.[aId]?.plans[pId]?.[field] || "0";
+  }
+  function setPlanVal(mId, aId, pId, field, val) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      if (!next[mId]) next[mId] = {};
+      if (!next[mId][aId]) {
+        next[mId][aId] = { plans: {}, globalRanges: [] };
+      }
+      if (!next[mId][aId].plans[pId]) {
+        next[mId][aId].plans[pId] = { base: "0", upgrade: "0" };
+      }
+      next[mId][aId].plans[pId][field] = val;
+      return next;
+    });
+  }
+
+  // agent-level date ranges
+  function addAgentDateRange(mId, aId) {
+    const block = overrideData[mId]?.[aId];
+    if (!block) return;
+    // user can only add a date range if at least one plan override row is in DB
+    const hasAnyDbId = Object.values(block.plans).some((p) => p.dbId);
+    if (!hasAnyDbId) {
+      alert(
+        "You must set a base/upgrade override (and save) for at least one plan before creating date ranges."
+      );
+      return;
     }
-    return existing;
-  }
 
-  function setBaseVal(agentId, planId, newVal, isUpgrade) {
-    setOverridesByAgent((prev) => {
-      const oldRow = prev[agentId] || {
-        id: null,
-        manager_id: managerId,
-        agent_id,
-        is_fidium: false,
-        plan_overrides: {},
-        date_ranges: [],
-      };
-      const oldPlanOverrides = oldRow.plan_overrides || {};
-      const oldPlanObj = oldPlanOverrides[planId] || { base: "0", upgrade: "0" };
-      return {
-        ...prev,
-        [agentId]: {
-          ...oldRow,
-          plan_overrides: {
-            ...oldPlanOverrides,
-            [planId]: {
-              ...oldPlanObj,
-              [isUpgrade ? "upgrade" : "base"]: newVal,
-            },
-          },
-        },
-      };
+    // proceed
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const planObj = {};
+      for (const pl of plans) {
+        planObj[pl.id] = { base: "0", upgrade: "0" };
+      }
+      next[mId][aId].globalRanges.push({
+        id: "local-" + Math.random().toString(36).slice(2),
+        start_date: "",
+        end_date: "",
+        rowIds: [],
+        planValues: planObj,
+      });
+      return next;
     });
   }
 
-  function getAgentDateRanges(agentId) {
-    return getOrCreateOverrideRow(agentId).date_ranges || [];
+  function setDateRangeVal(mId, aId, rangeId, field, value) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const ranges = next[mId][aId].globalRanges;
+      const idx = ranges.findIndex((r) => r.id === rangeId);
+      if (idx >= 0) {
+        ranges[idx][field] = value;
+      }
+      return next;
+    });
   }
 
-  function setAgentDateRanges(agentId, newRanges) {
-    setOverridesByAgent((prev) => {
-      const oldRow = getOrCreateOverrideRow(agentId);
-      return {
-        ...prev,
-        [agentId]: {
-          ...oldRow,
-          date_ranges: newRanges,
-        },
-      };
+  function setDateRangePlanVal(mId, aId, rangeId, planId, field, val) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const ranges = next[mId][aId].globalRanges;
+      const idx = ranges.findIndex((r) => r.id === rangeId);
+      if (idx >= 0) {
+        ranges[idx].planValues[planId][field] = val;
+      }
+      return next;
     });
   }
 
   async function handleSave() {
-    // upsert each row
-    const assignedAgents = getAssignedAgents(managerId);
-    // Also incorporate those in overridesByAgent (maybe not assigned anymore, but let's keep them if you want).
-    const allAgentIds = new Set([...assignedAgents.map((a) => a.id), ...Object.keys(overridesByAgent)]);
+    // For each manager->agent, upsert plan base/upgrade,
+    // remove old date range rows, then insert new from globalRanges
+    for (const mId in overrideData) {
+      for (const aId in overrideData[mId]) {
+        const block = overrideData[mId][aId];
 
-    const rowsToUpsert = [];
-    for (const agentId of allAgentIds) {
-      const rowObj = getOrCreateOverrideRow(agentId);
-      rowsToUpsert.push({
-        id: rowObj.id || undefined,
-        manager_id: rowObj.manager_id,
-        agent_id: rowObj.agent_id,
-        is_fidium: false,
-        plan_overrides: rowObj.plan_overrides || {},
-        date_ranges: rowObj.date_ranges || [],
-      });
-    }
+        // upsert each plan
+        for (const pId in block.plans) {
+          const baseVal = parseFloat(block.plans[pId].base) || 0;
+          const upgVal = parseFloat(block.plans[pId].upgrade) || 0;
+          let rowId = block.plans[pId].dbId;
 
-    for (const item of rowsToUpsert) {
-      const { error } = await supabase.from("manager_overrides").upsert(item).select("*").single();
-      if (error) {
-        console.error("Error upserting manager_overrides row:", error);
+          if (!rowId) {
+            // insert
+            const { data: inserted } = await supabase
+              .from("manager_agent_commissions")
+              .insert([
+                {
+                  manager_id: mId,
+                  agent_id: aId,
+                  plan_id: pId,
+                  manager_commission_value: baseVal,
+                  manager_upgrade_commission_value: upgVal,
+                },
+              ])
+              .select("*")
+              .single();
+            if (inserted) {
+              rowId = inserted.id;
+              block.plans[pId].dbId = rowId;
+            }
+          } else {
+            // update
+            await supabase
+              .from("manager_agent_commissions")
+              .update({
+                manager_commission_value: baseVal,
+                manager_upgrade_commission_value: upgVal,
+              })
+              .eq("id", rowId);
+          }
+
+          // remove old date ranges, then re-insert new
+          if (rowId) {
+            await supabase
+              .from("manager_agent_commission_date_ranges")
+              .delete()
+              .eq("manager_agent_commission_id", rowId);
+
+            for (const dr of block.globalRanges) {
+              const st = dr.start_date || null;
+              const ed = dr.end_date || null;
+              const bVal = parseFloat(dr.planValues[pId].base) || 0;
+              const uVal = parseFloat(dr.planValues[pId].upgrade) || 0;
+
+              await supabase.from("manager_agent_commission_date_ranges").insert([
+                {
+                  manager_agent_commission_id: rowId,
+                  plan_id: pId,
+                  start_date: st,
+                  end_date: ed,
+                  manager_commission_value: bVal,
+                  manager_upgrade_commission_value: uVal,
+                },
+              ]);
+            }
+          }
+        }
       }
     }
-
     onClose();
-  }
-
-  // If there's literally no managers, show empty state
-  if (managerList.length === 0) {
-    return (
-      <Dialog open onClose={onClose} size="md">
-        <DialogTitle>Manager Overrides ({payscaleName})</DialogTitle>
-        <DialogBody>No managers found.</DialogBody>
-        <DialogActions>
-          <Button onClick={onClose}>Close</Button>
-        </DialogActions>
-      </Dialog>
-    );
   }
 
   return (
     <Dialog open onClose={onClose} size="xl">
-      <DialogTitle>Manager Overrides ({payscaleName})</DialogTitle>
-      <DialogBody>
-        <Field className="mb-4">
-          <Label>Select Manager</Label>
-          <Select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
-            {managerList.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name || m.identifier}
-              </option>
-            ))}
-          </Select>
-        </Field>
+      <div className="flex flex-col h-[80vh]">
+        <div className="px-4 py-2 border-b">
+          <h2 className="text-xl font-bold">Manager Overrides: {payscale.name}</h2>
+        </div>
 
-        <hr className="my-4" />
+        <div className="overflow-auto p-4 flex-1">
+          {managedAgents.length === 0 ? (
+            <div>No agents assigned to managers with this payscale.</div>
+          ) : (
+            managedAgents.map((agent) => {
+              const managerLinks = agentManagers.filter(
+                (am) =>
+                  am.agent_id === agent.id &&
+                  agents.find((x) => x.id === am.manager_id)
+                    ?.manager_payscale_id === payscale.id
+              );
+              if (!managerLinks.length) return null;
 
-        {getAssignedAgents(managerId).length === 0 && (
-          <div className="text-sm text-gray-600">
-            No assigned agents for this manager.
-          </div>
-        )}
-        {getAssignedAgents(managerId).map((agt) => {
-          const overrideRow = getOrCreateOverrideRow(agt.id);
-          return (
-            <div key={agt.id} className="mb-6 border-b pb-4">
-              <h3 className="text-lg font-semibold mb-2">
-                Agent: {agt.name || agt.identifier}
-              </h3>
+              return (
+                <div key={agent.id} className="border p-4 mb-4 rounded bg-gray-50">
+                  <h3 className="font-bold text-lg mb-2">
+                    Agent: {agent.name || agent.identifier}
+                  </h3>
+                  {managerLinks.map((ml) => {
+                    const manager = agents.find((a) => a.id === ml.manager_id);
+                    if (!manager) return null;
 
-              <p className="text-sm font-medium text-gray-600 mb-2">
-                Plan Overrides (Base/Upgrade):
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {plans.map((p) => {
-                  const planObj = overrideRow.plan_overrides?.[p.id] || { base: "0", upgrade: "0" };
-                  return (
-                    <div key={p.id} className="border p-2 rounded bg-white text-sm">
-                      <div className="font-medium mb-1">{p.name}</div>
-                      <Field className="flex items-center mb-1">
-                        <Label className="w-1/3 text-xs">Base($)</Label>
-                        <Input
-                          type="number"
-                          value={planObj.base}
-                          onChange={(e) =>
-                            setBaseVal(agt.id, p.id, e.target.value, false)
-                          }
-                        />
-                      </Field>
-                      <Field className="flex items-center">
-                        <Label className="w-1/3 text-xs">Upgr($)</Label>
-                        <Input
-                          type="number"
-                          value={planObj.upgrade}
-                          onChange={(e) =>
-                            setBaseVal(agt.id, p.id, e.target.value, true)
-                          }
-                        />
-                      </Field>
-                    </div>
-                  );
-                })}
-              </div>
+                    return (
+                      <div key={ml.id} className="mb-4 border-l pl-4">
+                        <p className="text-gray-600 mb-2">
+                          Manager: {manager.name || manager.identifier}
+                        </p>
 
-              <p className="text-sm font-medium text-gray-600 mt-4 mb-2">
-                Date Range Overrides
-              </p>
-              <DateRangeManager
-                plans={plans}
-                dateRanges={overrideRow.date_ranges}
-                setDateRanges={(newRanges) => setAgentDateRanges(agt.id, newRanges)}
-                label="Override Commission Amounts by Date"
-              />
-            </div>
-          );
-        })}
-      </DialogBody>
-      <DialogActions>
-        <Button plain onClick={onClose}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave}>Save All</Button>
-      </DialogActions>
+                        {/* Per-plan base/upgrade overrides */}
+                        <div className="space-y-3">
+                          {plans.map((pl) => {
+                            const baseVal = getPlanVal(
+                              manager.id,
+                              agent.id,
+                              pl.id,
+                              "base"
+                            );
+                            const upgVal = getPlanVal(
+                              manager.id,
+                              agent.id,
+                              pl.id,
+                              "upgrade"
+                            );
+                            return (
+                              <div key={pl.id} className="flex items-center gap-4">
+                                <span className="w-40 font-semibold">{pl.name}</span>
+                                <Field className="flex items-center">
+                                  <Label className="text-xs mr-1">Base($)</Label>
+                                  <Input
+                                    type="number"
+                                    className="w-20"
+                                    value={baseVal}
+                                    onChange={(e) =>
+                                      setPlanVal(
+                                        manager.id,
+                                        agent.id,
+                                        pl.id,
+                                        "base",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                                <Field className="flex items-center">
+                                  <Label className="text-xs mr-1">Upg($)</Label>
+                                  <Input
+                                    type="number"
+                                    className="w-20"
+                                    value={upgVal}
+                                    onChange={(e) =>
+                                      setPlanVal(
+                                        manager.id,
+                                        agent.id,
+                                        pl.id,
+                                        "upgrade",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Agent-wide date ranges */}
+                        <div className="mt-4 p-2">
+                          <div className="font-semibold mb-2">Global Date Ranges</div>
+                          {overrideData[manager.id]?.[agent.id]?.globalRanges?.map((dr) => (
+                            <div
+                              key={dr.id}
+                              className="border p-2 rounded mb-2 space-y-2"
+                            >
+                              <div className="flex gap-4">
+                                <Field>
+                                  <Label className="text-xs">Start Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={dr.start_date}
+                                    onChange={(e) =>
+                                      setDateRangeVal(
+                                        manager.id,
+                                        agent.id,
+                                        dr.id,
+                                        "start_date",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                                <Field>
+                                  <Label className="text-xs">End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={dr.end_date}
+                                    onChange={(e) =>
+                                      setDateRangeVal(
+                                        manager.id,
+                                        agent.id,
+                                        dr.id,
+                                        "end_date",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                              </div>
+
+                              {/* plan-specific fields */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                {plans.map((pl) => {
+                                  const pValBase = dr.planValues[pl.id]?.base || "0";
+                                  const pValUpg = dr.planValues[pl.id]?.upgrade || "0";
+                                  return (
+                                    <div
+                                      key={pl.id}
+                                      className="border p-2 rounded text-sm"
+                                    >
+                                      <div className="font-medium mb-1">
+                                        {pl.name}
+                                      </div>
+                                      <Field className="flex items-center mb-1">
+                                        <Label className="w-1/3 text-xs">Base</Label>
+                                        <Input
+                                          type="number"
+                                          value={pValBase}
+                                          onChange={(e) =>
+                                            setDateRangePlanVal(
+                                              manager.id,
+                                              agent.id,
+                                              dr.id,
+                                              pl.id,
+                                              "base",
+                                              e.target.value
+                                            )
+                                          }
+                                        />
+                                      </Field>
+                                      <Field className="flex items-center">
+                                        <Label className="w-1/3 text-xs">Upg</Label>
+                                        <Input
+                                          type="number"
+                                          value={pValUpg}
+                                          onChange={(e) =>
+                                            setDateRangePlanVal(
+                                              manager.id,
+                                              agent.id,
+                                              dr.id,
+                                              pl.id,
+                                              "upgrade",
+                                              e.target.value
+                                            )
+                                          }
+                                        />
+                                      </Field>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => addAgentDateRange(manager.id, agent.id)}
+                          >
+                            + Add Date Range
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="border-t p-4 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>Save Overrides</Button>
+        </div>
+      </div>
     </Dialog>
   );
 }
@@ -4511,6 +7139,7 @@ export default function TabUsers({
       <Table striped>
         <TableHead>
           <TableRow>
+            <TableHeader>Actions</TableHeader>
             <TableHeader>Name</TableHeader>
             <TableHeader>Identifier</TableHeader>
             <TableHeader>Fidium ID</TableHeader>
@@ -4520,7 +7149,6 @@ export default function TabUsers({
             <TableHeader>Fidium Manager</TableHeader>
             <TableHeader>Is Manager</TableHeader>
             <TableHeader>Assigned Agents</TableHeader>
-            <TableHeader>Actions</TableHeader>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -4533,23 +7161,28 @@ export default function TabUsers({
 
             return (
               <TableRow key={agent.id}>
+                {/* Edit button now on the left */}
+                <TableCell>
+                  <Button size="sm" onClick={() => setEditAgent(agent)}>
+                    Edit
+                  </Button>
+                </TableCell>
                 <TableCell>{agent.name}</TableCell>
                 <TableCell>{agent.identifier}</TableCell>
                 <TableCell>{agent.fidium_identifier || ""}</TableCell>
                 <TableCell>{personal?.name || "N/A"}</TableCell>
-                <TableCell>{agent.is_manager ? manager?.name || "N/A" : "N/A"}</TableCell>
+                <TableCell>
+                  {agent.is_manager ? manager?.name || "N/A" : "N/A"}
+                </TableCell>
                 <TableCell>{fidPers?.name || "N/A"}</TableCell>
-                <TableCell>{agent.is_manager ? fidMgr?.name || "N/A" : "N/A"}</TableCell>
+                <TableCell>
+                  {agent.is_manager ? fidMgr?.name || "N/A" : "N/A"}
+                </TableCell>
                 <TableCell>{agent.is_manager ? "Yes" : "No"}</TableCell>
                 <TableCell>
                   {assigned.length > 0
                     ? assigned.map((a) => a.name || a.identifier).join(", ")
                     : "—"}
-                </TableCell>
-                <TableCell>
-                  <Button size="sm" onClick={() => setEditAgent(agent)}>
-                    Edit
-                  </Button>
                 </TableCell>
               </TableRow>
             );
@@ -4839,3 +7472,365 @@ export default function PayscalesPage() {
   );
 }
 
+
+
+// app/protected/layout.jsx
+'use client';
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { Avatar } from '@/components/avatar';
+import Image from 'next/image';
+import { BanknotesIcon,
+  ReceiptRefundIcon
+ } from '@heroicons/react/20/solid';
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownDivider,
+  DropdownItem,
+  DropdownLabel,
+  DropdownMenu,
+} from '@/components/dropdown';
+import {
+  Navbar,
+  NavbarItem,
+  NavbarSection,
+  NavbarSpacer,
+} from '@/components/navbar';
+import {
+  Sidebar,
+  SidebarBody,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarItem,
+  SidebarLabel,
+  SidebarSection,
+  SidebarSpacer,
+} from '@/components/sidebar';
+import { SidebarLayout } from '@/components/sidebar-layout';
+import {
+  ArrowRightStartOnRectangleIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  Cog8ToothIcon,
+  LightBulbIcon,
+  PlusIcon,
+  ShieldCheckIcon,
+  UserIcon,
+} from '@heroicons/react/16/solid';
+import {
+  Cog6ToothIcon,
+  HomeIcon,
+  MagnifyingGlassIcon,
+  QuestionMarkCircleIcon,
+  SparklesIcon,
+  UserIcon as UserIcon20,
+  CurrencyDollarIcon,
+  ChartBarIcon,
+} from '@heroicons/react/20/solid';
+import { createClient } from '@/utils/supabase/client';
+import { useRouter, usePathname } from 'next/navigation';
+
+/** Overdue if install_date is > 90 days old */
+function isOverdue(install_date) {
+  if (!install_date) return false;
+  const now = new Date();
+  const diffDays = (now - new Date(install_date)) / (1000 * 60 * 60 * 24);
+  return diffDays > 90;
+}
+
+const Example = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const [backendOverdueCount, setBackendOverdueCount] = useState(0);
+  const supabase = useMemo(() => createClient(), []);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) console.error('Error fetching user:', error);
+      else setUser(data.user);
+    };
+    fetchUser();
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => setUser(session?.user ?? null)
+    );
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  useEffect(() => {
+    // Now we only count overdue items that are actually referenced in payroll_reports.details
+    const fetchOverdueCount = async () => {
+      try {
+        // 1) Fetch all payroll reports
+        const { data: reportsData, error: prError } = await supabase
+          .from('payroll_reports')
+          .select('details');
+        if (prError) throw prError;
+        if (!reportsData) return;
+
+        // 2) Gather all referenced white glove IDs + fidium IDs
+        const whiteIds = [];
+        const fidiumIds = [];
+
+        for (const report of reportsData) {
+          const detailArray = report.details || [];
+          if (!Array.isArray(detailArray)) continue;
+          for (const d of detailArray) {
+            if (d.white_glove_entry_id) whiteIds.push(d.white_glove_entry_id);
+            if (d.fidium_white_glove_id) fidiumIds.push(d.fidium_white_glove_id);
+          }
+        }
+
+        // 3) Load those actual entries from DB
+        let count = 0;
+
+        if (whiteIds.length > 0) {
+          const { data: wgeData, error: wgeError } = await supabase
+            .from('white_glove_entries')
+            .select('install_date, backend_paid, id')
+            .in('id', whiteIds);
+          if (wgeError) throw wgeError;
+          for (const w of wgeData || []) {
+            if (!w.backend_paid && isOverdue(w.install_date)) count++;
+          }
+        }
+
+        if (fidiumIds.length > 0) {
+          const { data: fwgData, error: fwgError } = await supabase
+            .from('fidium_white_glove_entries')
+            .select('install_date, backend_paid, id')
+            .in('id', fidiumIds);
+          if (fwgError) throw fwgError;
+          for (const f of fwgData || []) {
+            if (!f.backend_paid && isOverdue(f.install_date)) count++;
+          }
+        }
+
+        setBackendOverdueCount(count);
+      } catch (err) {
+        console.error('Error fetching overdue count:', err);
+      }
+    };
+    fetchOverdueCount();
+  }, [supabase]);
+
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error('Error signing out:', error);
+    else router.push('/sign-in');
+  };
+
+  const nonClickableClass = 'text-gray-600 dark:text-gray-400 cursor-default rounded-md';
+  const linkClass =
+    'flex items-center cursor-pointer text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-md';
+  const isActive = (url) => (pathname === url ? 'bg-gray-200 dark:bg-gray-800' : '');
+
+  return (
+    <SidebarLayout
+      navbar={
+        <Navbar>
+          <NavbarSpacer />
+          <NavbarSection>
+            <NavbarItem className={`${nonClickableClass} flex items-center`}>
+              <MagnifyingGlassIcon className="h-5 w-5" />
+            </NavbarItem>
+            <NavbarItem className={`${nonClickableClass} flex items-center`}>
+              <HomeIcon className="h-5 w-5" />
+            </NavbarItem>
+            <Dropdown>
+              <DropdownButton as={NavbarItem}>
+                <Avatar src={user?.user_metadata?.avatar_url || '/snowma.jpeg'} square />
+              </DropdownButton>
+              <DropdownMenu className="min-w-64" anchor="bottom end">
+                <DropdownItem className="flex items-center cursor-default">
+                  <UserIcon className="h-5 w-5 mr-2" />
+                  <DropdownLabel>My profile</DropdownLabel>
+                </DropdownItem>
+                <DropdownItem className="flex items-center cursor-default">
+                  <Cog8ToothIcon className="h-5 w-5 mr-2" />
+                  <DropdownLabel>Settings</DropdownLabel>
+                </DropdownItem>
+                <DropdownDivider />
+                <DropdownItem className="flex items-center cursor-default">
+                  <ShieldCheckIcon className="h-5 w-5 mr-2" />
+                  <DropdownLabel>Privacy policy</DropdownLabel>
+                </DropdownItem>
+                <DropdownItem className="flex items-center cursor-default">
+                  <LightBulbIcon className="h-5 w-5 mr-2" />
+                  <DropdownLabel>Share feedback</DropdownLabel>
+                </DropdownItem>
+                <DropdownDivider />
+                <DropdownItem onClick={handleSignOut} className="flex items-center cursor-pointer">
+                  <ArrowRightStartOnRectangleIcon className="h-5 w-5 mr-2" />
+                  <DropdownLabel>Sign out</DropdownLabel>
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          </NavbarSection>
+        </Navbar>
+      }
+      sidebar={
+        <Sidebar>
+          <SidebarHeader>
+            <Dropdown>
+              <DropdownButton as={SidebarItem} className="lg:mb-2.5 flex items-center">
+                <Avatar src="/snowma.jpeg" />
+                <SidebarLabel className="ml-2">{user?.email || 'monkey@example.com'}</SidebarLabel>
+                <ChevronDownIcon className="h-4 w-4 ml-auto" />
+              </DropdownButton>
+              <DropdownMenu className="min-w-80 lg:min-w-64" anchor="bottom start">
+                <DropdownItem href="/teams/1/settings" className="flex items-center">
+                  <Cog8ToothIcon className="h-5 w-5 mr-2" />
+                  <DropdownLabel>Settings</DropdownLabel>
+                </DropdownItem>
+                <DropdownDivider />
+                <DropdownItem href="/teams/1" className="flex items-center">
+                  <Avatar slot="icon" src="/snowma.jpeg" />
+                  <DropdownLabel className="ml-2">
+                    {user?.email || 'monkey@example.com'}
+                  </DropdownLabel>
+                </DropdownItem>
+                <DropdownDivider />
+                <DropdownItem href="/teams/create" className="flex items-center">
+                  <PlusIcon className="h-5 w-5 mr-2" />
+                  <DropdownLabel>New team&hellip;</DropdownLabel>
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          </SidebarHeader>
+          <SidebarBody>
+            <SidebarSection>
+              <SidebarItem
+                className={`${linkClass} ${isActive('/protected/payroll')}`}
+                onClick={() => router.push('/protected/payroll')}
+              >
+                <CurrencyDollarIcon className="h-5 w-5 mr-2" />
+                <SidebarLabel>Calculate</SidebarLabel>
+              </SidebarItem>
+              <SidebarItem
+                className={`${linkClass} ${isActive('/protected/payscales')}`}
+                onClick={() => router.push('/protected/payscales')}
+              >
+                <ChartBarIcon className="h-5 w-5 mr-2" />
+                <SidebarLabel>Payscales</SidebarLabel>
+              </SidebarItem>
+              <SidebarItem
+                className={`${linkClass} ${isActive('/protected/frontend')}`}
+                onClick={() => router.push('/protected/frontend')}
+              >
+                <BanknotesIcon className="h-5 w-5 mr-2" />
+                <SidebarLabel>Frontend</SidebarLabel>
+              </SidebarItem>
+              <SidebarItem
+                className={`${linkClass} ${isActive('/protected/backend')} relative`}
+                onClick={() => router.push('/protected/backend')}
+              >
+                <BanknotesIcon className="h-5 w-5 mr-2" />
+                <SidebarLabel>Backend</SidebarLabel>
+                {backendOverdueCount > 0 && (
+                  <span className="absolute right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-white bg-red-600 rounded-full">
+                    {backendOverdueCount}
+                  </span>
+                )}
+              </SidebarItem>
+              <SidebarItem
+                className={`${linkClass} ${isActive('/protected/deductions')}`}
+                onClick={() => router.push('/protected/deductions')}
+              >
+                <ReceiptRefundIcon className="h-5 w-5 mr-2" />
+                <SidebarLabel>Deductions / Reimbursements</SidebarLabel>
+              </SidebarItem>
+            </SidebarSection>
+            <SidebarSpacer />
+            <SidebarSection>
+              <SidebarItem className={`flex items-center ${nonClickableClass}`}>
+                <QuestionMarkCircleIcon className="h-5 w-5 mr-2" />
+                <SidebarLabel>Support</SidebarLabel>
+              </SidebarItem>
+              <SidebarItem className={`flex items-center ${nonClickableClass}`}>
+                <SparklesIcon className="h-5 w-5 mr-2" />
+                <SidebarLabel>Changelog</SidebarLabel>
+              </SidebarItem>
+            </SidebarSection>
+          </SidebarBody>
+          <SidebarFooter className="max-lg:hidden">
+            <Dropdown>
+              <DropdownButton as={SidebarItem} className="flex items-center">
+                <span className="flex min-w-0 items-center gap-3">
+                  <Avatar
+                    src={user?.user_metadata?.avatar_url || '/snowma.jpeg'}
+                    className="size-10"
+                    square
+                    alt="Profile"
+                  />
+                  <span className="flex flex-col ml-2">
+                    <span className="block truncate text-sm font-medium text-zinc-950 dark:text-white">
+                      {user?.user_metadata?.full_name || 'User'}
+                    </span>
+                    <span className="block truncate text-xs font-normal text-zinc-500 dark:text-zinc-400">
+                      {user?.email || 'monkey@example.com'}
+                    </span>
+                  </span>
+                </span>
+                <ChevronUpIcon className="h-4 w-4 ml-auto" />
+              </DropdownButton>
+              <DropdownMenu className="min-w-64" anchor="top start">
+                <DropdownItem className="flex items-center cursor-default">
+                  <UserIcon20 className="h-5 w-5 mr-2" />
+                  <DropdownLabel>My profile</DropdownLabel>
+                </DropdownItem>
+                <DropdownItem className="flex items-center cursor-default">
+                  <Cog8ToothIcon className="h-5 w-5 mr-2" />
+                  <DropdownLabel>Settings</DropdownLabel>
+                </DropdownItem>
+                <DropdownDivider />
+                <DropdownItem className="flex items-center cursor-default">
+                  <ShieldCheckIcon className="h-5 w-5 mr-2" />
+                  <DropdownLabel>Privacy policy</DropdownLabel>
+                </DropdownItem>
+                <DropdownItem className="flex items-center cursor-default">
+                  <LightBulbIcon className="h-5 w-5 mr-2" />
+                  <DropdownLabel>Share feedback</DropdownLabel>
+                </DropdownItem>
+                <DropdownDivider />
+                <DropdownItem onClick={handleSignOut} className="flex items-center cursor-pointer">
+                  <ArrowRightStartOnRectangleIcon className="h-5 w-5 mr-2" />
+                  <DropdownLabel>Sign out</DropdownLabel>
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          </SidebarFooter>
+        </Sidebar>
+      }
+    >
+      {children}
+    </SidebarLayout>
+  );
+};
+
+export default Example;
+
+
+
+// app/protected/page.jsx
+// pages/index.js
+export default function HomePage() {
+  return (
+    <main style={{ fontFamily: "sans-serif", textAlign: "center", marginTop: "2rem" }}>
+      <p>Choose a page</p>
+    </main>
+  );
+}
+
+I need it so that when you hit the save report button a modal will popup first asking if you wanted to attach any deductions or reimbursements
+it will be a sorta wide modal. within this modal you could also create a deduction or reimbursement to attach
+
+if attached then i need an extra column in frontend backend for deductions / reimbursements that then gives the new total of the 80%
+
+really only needs to apply to the frontend. all the logic is already there for this in the reimbursements deductions page
+
+For all affected files, give me the full file back with nothing left out, and with no abbreviations. Full file.

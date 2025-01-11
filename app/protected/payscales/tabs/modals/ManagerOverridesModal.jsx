@@ -1,255 +1,499 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import React, { useState, useEffect } from "react";
+import { Dialog } from "@/components/dialog";
 import { Field, Label } from "@/components/fieldset";
-import { Select } from "@/components/select";
 import { Input } from "@/components/input";
 import { Button } from "@/components/button";
-import DateRangeManager from "./DateRangeManager";
 
 /**
- * Normal Manager Overrides using the new "manager_overrides" table with is_fidium=false.
+ * ManagerOverridesModal
  *
- * - managerList: array of manager objects => must not be undefined.
- *   We'll default to an empty array if not provided.
- * - assignedAgentsMap: function that returns an array of agents for a given managerId. Also default to [] if it returns nothing.
- * - plans: array of plan objects => default to [] if not provided.
- * - supabase instance
+ * For each agent managed by a manager on this normal manager payscale:
+ * - We unify existing date-range rows that share start_date/end_date into a single `globalRanges` object.
+ * - The user can only add/edit date ranges if there's at least one plan override row (dbId) for that manager->agent.
+ * - On save, we remove old date-range rows and re-insert them in one pass.
  */
 export default function ManagerOverridesModal({
-  payscaleName = "My Payscale",
-  managerList = [],
-  assignedAgentsMap = () => [],
-  plans = [],
+  payscale,
+  agents,
+  agentManagers,
+  plans,
   supabase,
   onClose,
 }) {
-  // If managerList is empty, set managerId = "" to avoid TypeError
-  const initialManagerId = managerList.length > 0 ? managerList[0].id : "";
-  const [managerId, setManagerId] = useState(initialManagerId);
+  const [managedAgents, setManagedAgents] = useState([]);
 
-  // { [agentId]: { id, manager_id, agent_id, plan_overrides, date_ranges } }
-  const [overridesByAgent, setOverridesByAgent] = useState({});
+  /**
+   * overrideData shape:
+   *   {
+   *     [managerId]: {
+   *       [agentId]: {
+   *         plans: {
+   *           [planId]: { base: string, upgrade: string, dbId?: string }
+   *         },
+   *         globalRanges: [
+   *           {
+   *             id: string,
+   *             start_date: string,
+   *             end_date: string,
+   *             rowIds: array<string>,
+   *             planValues: {
+   *               [planId]: { base: string, upgrade: string }
+   *             }
+   *           }
+   *         ]
+   *       }
+   *     }
+   *   }
+   */
+  const [overrideData, setOverrideData] = useState({});
 
   useEffect(() => {
-    if (managerId) {
-      fetchOverrides(managerId);
-    } else {
-      setOverridesByAgent({});
-    }
+    const managerIds = agents
+      .filter((a) => a.manager_payscale_id === payscale.id)
+      .map((a) => a.id);
+
+    const relevantLinks = agentManagers.filter((am) =>
+      managerIds.includes(am.manager_id)
+    );
+    const relevantAgentIds = [...new Set(relevantLinks.map((am) => am.agent_id))];
+    setManagedAgents(agents.filter((a) => relevantAgentIds.includes(a.id)));
+
+    loadExistingOverrides(managerIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [managerId]);
+  }, []);
 
-  async function fetchOverrides(mId) {
-    const { data, error } = await supabase
-      .from("manager_overrides")
-      .select("*")
-      .eq("manager_id", mId)
-      .eq("is_fidium", false);
-
-    if (error) {
-      console.error("Error fetching overrides", error);
-      setOverridesByAgent({});
+  async function loadExistingOverrides(managerIds) {
+    if (!managerIds.length) {
+      setOverrideData({});
       return;
     }
-    const map = {};
-    (data || []).forEach((row) => {
-      map[row.agent_id] = row;
-    });
-    setOverridesByAgent(map);
-  }
 
-  function getAssignedAgents(mId) {
-    const result = assignedAgentsMap(mId);
-    return Array.isArray(result) ? result : [];
-  }
+    const { data: overrides } = await supabase
+      .from("manager_agent_commissions")
+      .select("*, manager_agent_commission_date_ranges(*)")
+      .in("manager_id", managerIds);
 
-  function getOrCreateOverrideRow(agentId) {
-    const existing = overridesByAgent[agentId];
-    if (!existing) {
-      return {
-        id: null,
-        manager_id: managerId,
-        agent_id: agentId,
-        is_fidium: false,
-        plan_overrides: {},
-        date_ranges: [],
+    const initData = {};
+
+    (overrides || []).forEach((ov) => {
+      const mId = ov.manager_id;
+      const aId = ov.agent_id;
+      const pId = ov.plan_id;
+
+      if (!initData[mId]) initData[mId] = {};
+      if (!initData[mId][aId]) {
+        initData[mId][aId] = {
+          plans: {},
+          globalRanges: [],
+        };
+      }
+
+      // per-plan base/upgrade override
+      initData[mId][aId].plans[pId] = {
+        base: ov.manager_commission_value?.toString() || "0",
+        upgrade: ov.manager_upgrade_commission_value?.toString() || "0",
+        dbId: ov.id,
       };
+
+      // unify date ranges
+      (ov.manager_agent_commission_date_ranges || []).forEach((dr) => {
+        const s = dr.start_date || "";
+        const e = dr.end_date || "";
+        const block = initData[mId][aId];
+        let rangeObj = block.globalRanges.find(
+          (x) => x.start_date === s && x.end_date === e
+        );
+        if (!rangeObj) {
+          // create
+          const planObj = {};
+          for (const pl of plans) {
+            planObj[pl.id] = { base: "0", upgrade: "0" };
+          }
+          rangeObj = {
+            id: "db-" + Math.random().toString(36).slice(2),
+            start_date: s,
+            end_date: e,
+            rowIds: [],
+            planValues: planObj,
+          };
+          block.globalRanges.push(rangeObj);
+        }
+        rangeObj.rowIds.push(dr.id);
+
+        // set plan’s base/upgrade
+        rangeObj.planValues[pId].base =
+          dr.manager_commission_value?.toString() || "0";
+        rangeObj.planValues[pId].upgrade =
+          dr.manager_upgrade_commission_value?.toString() || "0";
+      });
+    });
+
+    setOverrideData(initData);
+  }
+
+  // per-plan outside date ranges
+  function getPlanVal(mId, aId, pId, field) {
+    return overrideData[mId]?.[aId]?.plans[pId]?.[field] || "0";
+  }
+  function setPlanVal(mId, aId, pId, field, val) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      if (!next[mId]) next[mId] = {};
+      if (!next[mId][aId]) {
+        next[mId][aId] = { plans: {}, globalRanges: [] };
+      }
+      if (!next[mId][aId].plans[pId]) {
+        next[mId][aId].plans[pId] = { base: "0", upgrade: "0" };
+      }
+      next[mId][aId].plans[pId][field] = val;
+      return next;
+    });
+  }
+
+  // agent-level date ranges
+  function addAgentDateRange(mId, aId) {
+    const block = overrideData[mId]?.[aId];
+    if (!block) return;
+    // user can only add a date range if at least one plan override row is in DB
+    const hasAnyDbId = Object.values(block.plans).some((p) => p.dbId);
+    if (!hasAnyDbId) {
+      alert(
+        "You must set a base/upgrade override (and save) for at least one plan before creating date ranges."
+      );
+      return;
     }
-    return existing;
-  }
 
-  function setBaseVal(agentId, planId, newVal, isUpgrade) {
-    setOverridesByAgent((prev) => {
-      const oldRow = prev[agentId] || {
-        id: null,
-        manager_id: managerId,
-        agent_id,
-        is_fidium: false,
-        plan_overrides: {},
-        date_ranges: [],
-      };
-      const oldPlanOverrides = oldRow.plan_overrides || {};
-      const oldPlanObj = oldPlanOverrides[planId] || { base: "0", upgrade: "0" };
-      return {
-        ...prev,
-        [agentId]: {
-          ...oldRow,
-          plan_overrides: {
-            ...oldPlanOverrides,
-            [planId]: {
-              ...oldPlanObj,
-              [isUpgrade ? "upgrade" : "base"]: newVal,
-            },
-          },
-        },
-      };
+    // proceed
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const planObj = {};
+      for (const pl of plans) {
+        planObj[pl.id] = { base: "0", upgrade: "0" };
+      }
+      next[mId][aId].globalRanges.push({
+        id: "local-" + Math.random().toString(36).slice(2),
+        start_date: "",
+        end_date: "",
+        rowIds: [],
+        planValues: planObj,
+      });
+      return next;
     });
   }
 
-  function getAgentDateRanges(agentId) {
-    return getOrCreateOverrideRow(agentId).date_ranges || [];
+  function setDateRangeVal(mId, aId, rangeId, field, value) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const ranges = next[mId][aId].globalRanges;
+      const idx = ranges.findIndex((r) => r.id === rangeId);
+      if (idx >= 0) {
+        ranges[idx][field] = value;
+      }
+      return next;
+    });
   }
 
-  function setAgentDateRanges(agentId, newRanges) {
-    setOverridesByAgent((prev) => {
-      const oldRow = getOrCreateOverrideRow(agentId);
-      return {
-        ...prev,
-        [agentId]: {
-          ...oldRow,
-          date_ranges: newRanges,
-        },
-      };
+  function setDateRangePlanVal(mId, aId, rangeId, planId, field, val) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const ranges = next[mId][aId].globalRanges;
+      const idx = ranges.findIndex((r) => r.id === rangeId);
+      if (idx >= 0) {
+        ranges[idx].planValues[planId][field] = val;
+      }
+      return next;
     });
   }
 
   async function handleSave() {
-    // upsert each row
-    const assignedAgents = getAssignedAgents(managerId);
-    // Also incorporate those in overridesByAgent (maybe not assigned anymore, but let's keep them if you want).
-    const allAgentIds = new Set([...assignedAgents.map((a) => a.id), ...Object.keys(overridesByAgent)]);
+    // For each manager->agent, upsert plan base/upgrade,
+    // remove old date range rows, then insert new from globalRanges
+    for (const mId in overrideData) {
+      for (const aId in overrideData[mId]) {
+        const block = overrideData[mId][aId];
 
-    const rowsToUpsert = [];
-    for (const agentId of allAgentIds) {
-      const rowObj = getOrCreateOverrideRow(agentId);
-      rowsToUpsert.push({
-        id: rowObj.id || undefined,
-        manager_id: rowObj.manager_id,
-        agent_id: rowObj.agent_id,
-        is_fidium: false,
-        plan_overrides: rowObj.plan_overrides || {},
-        date_ranges: rowObj.date_ranges || [],
-      });
-    }
+        // upsert each plan
+        for (const pId in block.plans) {
+          const baseVal = parseFloat(block.plans[pId].base) || 0;
+          const upgVal = parseFloat(block.plans[pId].upgrade) || 0;
+          let rowId = block.plans[pId].dbId;
 
-    for (const item of rowsToUpsert) {
-      const { error } = await supabase.from("manager_overrides").upsert(item).select("*").single();
-      if (error) {
-        console.error("Error upserting manager_overrides row:", error);
+          if (!rowId) {
+            // insert
+            const { data: inserted } = await supabase
+              .from("manager_agent_commissions")
+              .insert([
+                {
+                  manager_id: mId,
+                  agent_id: aId,
+                  plan_id: pId,
+                  manager_commission_value: baseVal,
+                  manager_upgrade_commission_value: upgVal,
+                },
+              ])
+              .select("*")
+              .single();
+            if (inserted) {
+              rowId = inserted.id;
+              block.plans[pId].dbId = rowId;
+            }
+          } else {
+            // update
+            await supabase
+              .from("manager_agent_commissions")
+              .update({
+                manager_commission_value: baseVal,
+                manager_upgrade_commission_value: upgVal,
+              })
+              .eq("id", rowId);
+          }
+
+          // remove old date ranges, then re-insert new
+          if (rowId) {
+            await supabase
+              .from("manager_agent_commission_date_ranges")
+              .delete()
+              .eq("manager_agent_commission_id", rowId);
+
+            for (const dr of block.globalRanges) {
+              const st = dr.start_date || null;
+              const ed = dr.end_date || null;
+              const bVal = parseFloat(dr.planValues[pId].base) || 0;
+              const uVal = parseFloat(dr.planValues[pId].upgrade) || 0;
+
+              await supabase.from("manager_agent_commission_date_ranges").insert([
+                {
+                  manager_agent_commission_id: rowId,
+                  plan_id: pId,
+                  start_date: st,
+                  end_date: ed,
+                  manager_commission_value: bVal,
+                  manager_upgrade_commission_value: uVal,
+                },
+              ]);
+            }
+          }
+        }
       }
     }
-
     onClose();
-  }
-
-  // If there's literally no managers, show empty state
-  if (managerList.length === 0) {
-    return (
-      <Dialog open onClose={onClose} size="md">
-        <DialogTitle>Manager Overrides ({payscaleName})</DialogTitle>
-        <DialogBody>No managers found.</DialogBody>
-        <DialogActions>
-          <Button onClick={onClose}>Close</Button>
-        </DialogActions>
-      </Dialog>
-    );
   }
 
   return (
     <Dialog open onClose={onClose} size="xl">
-      <DialogTitle>Manager Overrides ({payscaleName})</DialogTitle>
-      <DialogBody>
-        <Field className="mb-4">
-          <Label>Select Manager</Label>
-          <Select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
-            {managerList.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name || m.identifier}
-              </option>
-            ))}
-          </Select>
-        </Field>
+      <div className="flex flex-col h-[80vh]">
+        <div className="px-4 py-2 border-b">
+          <h2 className="text-xl font-bold">Manager Overrides: {payscale.name}</h2>
+        </div>
 
-        <hr className="my-4" />
+        <div className="overflow-auto p-4 flex-1">
+          {managedAgents.length === 0 ? (
+            <div>No agents assigned to managers with this payscale.</div>
+          ) : (
+            managedAgents.map((agent) => {
+              const managerLinks = agentManagers.filter(
+                (am) =>
+                  am.agent_id === agent.id &&
+                  agents.find((x) => x.id === am.manager_id)
+                    ?.manager_payscale_id === payscale.id
+              );
+              if (!managerLinks.length) return null;
 
-        {getAssignedAgents(managerId).length === 0 && (
-          <div className="text-sm text-gray-600">
-            No assigned agents for this manager.
-          </div>
-        )}
-        {getAssignedAgents(managerId).map((agt) => {
-          const overrideRow = getOrCreateOverrideRow(agt.id);
-          return (
-            <div key={agt.id} className="mb-6 border-b pb-4">
-              <h3 className="text-lg font-semibold mb-2">
-                Agent: {agt.name || agt.identifier}
-              </h3>
+              return (
+                <div key={agent.id} className="border p-4 mb-4 rounded bg-gray-50">
+                  <h3 className="font-bold text-lg mb-2">
+                    Agent: {agent.name || agent.identifier}
+                  </h3>
+                  {managerLinks.map((ml) => {
+                    const manager = agents.find((a) => a.id === ml.manager_id);
+                    if (!manager) return null;
 
-              <p className="text-sm font-medium text-gray-600 mb-2">
-                Plan Overrides (Base/Upgrade):
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {plans.map((p) => {
-                  const planObj = overrideRow.plan_overrides?.[p.id] || { base: "0", upgrade: "0" };
-                  return (
-                    <div key={p.id} className="border p-2 rounded bg-white text-sm">
-                      <div className="font-medium mb-1">{p.name}</div>
-                      <Field className="flex items-center mb-1">
-                        <Label className="w-1/3 text-xs">Base($)</Label>
-                        <Input
-                          type="number"
-                          value={planObj.base}
-                          onChange={(e) =>
-                            setBaseVal(agt.id, p.id, e.target.value, false)
-                          }
-                        />
-                      </Field>
-                      <Field className="flex items-center">
-                        <Label className="w-1/3 text-xs">Upgr($)</Label>
-                        <Input
-                          type="number"
-                          value={planObj.upgrade}
-                          onChange={(e) =>
-                            setBaseVal(agt.id, p.id, e.target.value, true)
-                          }
-                        />
-                      </Field>
-                    </div>
-                  );
-                })}
-              </div>
+                    return (
+                      <div key={ml.id} className="mb-4 border-l pl-4">
+                        <p className="text-gray-600 mb-2">
+                          Manager: {manager.name || manager.identifier}
+                        </p>
 
-              <p className="text-sm font-medium text-gray-600 mt-4 mb-2">
-                Date Range Overrides
-              </p>
-              <DateRangeManager
-                plans={plans}
-                dateRanges={overrideRow.date_ranges}
-                setDateRanges={(newRanges) => setAgentDateRanges(agt.id, newRanges)}
-                label="Override Commission Amounts by Date"
-              />
-            </div>
-          );
-        })}
-      </DialogBody>
-      <DialogActions>
-        <Button plain onClick={onClose}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave}>Save All</Button>
-      </DialogActions>
+                        {/* Per-plan base/upgrade overrides */}
+                        <div className="space-y-3">
+                          {plans.map((pl) => {
+                            const baseVal = getPlanVal(
+                              manager.id,
+                              agent.id,
+                              pl.id,
+                              "base"
+                            );
+                            const upgVal = getPlanVal(
+                              manager.id,
+                              agent.id,
+                              pl.id,
+                              "upgrade"
+                            );
+                            return (
+                              <div key={pl.id} className="flex items-center gap-4">
+                                <span className="w-40 font-semibold">{pl.name}</span>
+                                <Field className="flex items-center">
+                                  <Label className="text-xs mr-1">Base($)</Label>
+                                  <Input
+                                    type="number"
+                                    className="w-20"
+                                    value={baseVal}
+                                    onChange={(e) =>
+                                      setPlanVal(
+                                        manager.id,
+                                        agent.id,
+                                        pl.id,
+                                        "base",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                                <Field className="flex items-center">
+                                  <Label className="text-xs mr-1">Upg($)</Label>
+                                  <Input
+                                    type="number"
+                                    className="w-20"
+                                    value={upgVal}
+                                    onChange={(e) =>
+                                      setPlanVal(
+                                        manager.id,
+                                        agent.id,
+                                        pl.id,
+                                        "upgrade",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Agent-wide date ranges */}
+                        <div className="mt-4 p-2">
+                          <div className="font-semibold mb-2">Global Date Ranges</div>
+                          {overrideData[manager.id]?.[agent.id]?.globalRanges?.map((dr) => (
+                            <div
+                              key={dr.id}
+                              className="border p-2 rounded mb-2 space-y-2"
+                            >
+                              <div className="flex gap-4">
+                                <Field>
+                                  <Label className="text-xs">Start Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={dr.start_date}
+                                    onChange={(e) =>
+                                      setDateRangeVal(
+                                        manager.id,
+                                        agent.id,
+                                        dr.id,
+                                        "start_date",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                                <Field>
+                                  <Label className="text-xs">End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={dr.end_date}
+                                    onChange={(e) =>
+                                      setDateRangeVal(
+                                        manager.id,
+                                        agent.id,
+                                        dr.id,
+                                        "end_date",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                              </div>
+
+                              {/* plan-specific fields */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                {plans.map((pl) => {
+                                  const pValBase = dr.planValues[pl.id]?.base || "0";
+                                  const pValUpg = dr.planValues[pl.id]?.upgrade || "0";
+                                  return (
+                                    <div
+                                      key={pl.id}
+                                      className="border p-2 rounded text-sm"
+                                    >
+                                      <div className="font-medium mb-1">
+                                        {pl.name}
+                                      </div>
+                                      <Field className="flex items-center mb-1">
+                                        <Label className="w-1/3 text-xs">Base</Label>
+                                        <Input
+                                          type="number"
+                                          value={pValBase}
+                                          onChange={(e) =>
+                                            setDateRangePlanVal(
+                                              manager.id,
+                                              agent.id,
+                                              dr.id,
+                                              pl.id,
+                                              "base",
+                                              e.target.value
+                                            )
+                                          }
+                                        />
+                                      </Field>
+                                      <Field className="flex items-center">
+                                        <Label className="w-1/3 text-xs">Upg</Label>
+                                        <Input
+                                          type="number"
+                                          value={pValUpg}
+                                          onChange={(e) =>
+                                            setDateRangePlanVal(
+                                              manager.id,
+                                              agent.id,
+                                              dr.id,
+                                              pl.id,
+                                              "upgrade",
+                                              e.target.value
+                                            )
+                                          }
+                                        />
+                                      </Field>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => addAgentDateRange(manager.id, agent.id)}
+                          >
+                            + Add Date Range
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="border-t p-4 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>Save Overrides</Button>
+        </div>
+      </div>
     </Dialog>
   );
 }

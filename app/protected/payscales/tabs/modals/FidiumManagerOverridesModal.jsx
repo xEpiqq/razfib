@@ -1,239 +1,439 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Dialog, DialogTitle, DialogBody, DialogActions } from "@/components/dialog";
+import React, { useState, useEffect } from "react";
+import { Dialog } from "@/components/dialog";
 import { Field, Label } from "@/components/fieldset";
-import { Select } from "@/components/select";
 import { Input } from "@/components/input";
 import { Button } from "@/components/button";
-import DateRangeManagerFidium from "./DateRangeManagerFidium";
 
 /**
- * Fidium Manager Overrides using "manager_overrides" table with is_fidium=true.
+ * FidiumManagerOverridesModal
  *
- * Props:
- *   - payscaleName (string)
- *   - managerList: array of manager objects
- *   - assignedAgentsMap: function that returns array of agents for a manager
- *   - fidiumPlans: array of {id, name}
- *   - supabase
+ * For each agent managed by a manager on this Fidium manager payscale:
+ * - We unify existing date-range rows that share start_date/end_date into a single `globalRanges` object.
+ * - The user can only add/edit date ranges if there's at least one plan override row (dbId) for that manager->agent.
+ * - On save, we remove old date-range rows and re-insert them in one pass.
  */
 export default function FidiumManagerOverridesModal({
-  payscaleName = "Fidium Payscale",
-  managerList = [],
-  assignedAgentsMap = () => [],
-  fidiumPlans = [],
+  payscale,
+  agents,
+  agentManagers,
+  fidiumPlans,
   supabase,
   onClose,
 }) {
-  const initialManagerId = managerList.length > 0 ? managerList[0].id : "";
-  const [managerId, setManagerId] = useState(initialManagerId);
+  const [managedAgents, setManagedAgents] = useState([]);
 
-  const [overridesByAgent, setOverridesByAgent] = useState({});
+  /**
+   * overrideData shape:
+   *   {
+   *     [managerId]: {
+   *       [agentId]: {
+   *         plans: {
+   *           [planId]: { base: string, dbId?: string }
+   *         },
+   *         globalRanges: [
+   *           {
+   *             id: string,           // local ID for React
+   *             start_date: string,
+   *             end_date: string,
+   *             rowIds: array<string>, // existing DB row IDs
+   *             planValues: {
+   *               [planId]: { base: string }
+   *             }
+   *           }
+   *         ]
+   *       }
+   *     }
+   *   }
+   */
+  const [overrideData, setOverrideData] = useState({});
 
   useEffect(() => {
-    if (managerId) {
-      fetchOverrides(managerId);
-    } else {
-      setOverridesByAgent({});
-    }
+    const managerIds = agents
+      .filter((a) => a.fidium_manager_payscale_id === payscale.id)
+      .map((a) => a.id);
+
+    const relevantLinks = agentManagers.filter((am) =>
+      managerIds.includes(am.manager_id)
+    );
+    const relevantAgentIds = [...new Set(relevantLinks.map((am) => am.agent_id))];
+    setManagedAgents(agents.filter((a) => relevantAgentIds.includes(a.id)));
+
+    loadExistingOverrides(managerIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [managerId]);
+  }, []);
 
-  async function fetchOverrides(mId) {
-    const { data, error } = await supabase
-      .from("manager_overrides")
-      .select("*")
-      .eq("manager_id", mId)
-      .eq("is_fidium", true);
-
-    if (error) {
-      console.error("Error fetching Fidium overrides:", error);
-      setOverridesByAgent({});
+  async function loadExistingOverrides(managerIds) {
+    if (!managerIds.length) {
+      setOverrideData({});
       return;
     }
-    const map = {};
-    (data || []).forEach((row) => {
-      map[row.agent_id] = row;
-    });
-    setOverridesByAgent(map);
-  }
 
-  function getAssignedAgents(mId) {
-    const result = assignedAgentsMap(mId);
-    return Array.isArray(result) ? result : [];
-  }
+    const { data: overrides } = await supabase
+      .from("fidium_manager_agent_commissions")
+      .select("*, fidium_manager_agent_commission_date_ranges(*)")
+      .in("manager_id", managerIds);
 
-  function getOrCreateOverrideRow(agentId) {
-    const existing = overridesByAgent[agentId];
-    if (!existing) {
-      return {
-        id: null,
-        manager_id: managerId,
-        agent_id: agentId,
-        is_fidium: true,
-        plan_overrides: {},
-        date_ranges: [],
+    const initData = {};
+
+    (overrides || []).forEach((ov) => {
+      const mId = ov.manager_id;
+      const aId = ov.agent_id;
+      const pId = ov.fidium_plan_id;
+
+      if (!initData[mId]) initData[mId] = {};
+      if (!initData[mId][aId]) {
+        initData[mId][aId] = {
+          plans: {},
+          globalRanges: [],
+        };
+      }
+
+      // per-plan base override
+      initData[mId][aId].plans[pId] = {
+        base: ov.manager_commission_value?.toString() || "0",
+        dbId: ov.id,
       };
+
+      // unify date ranges by (start_date, end_date)
+      (ov.fidium_manager_agent_commission_date_ranges || []).forEach((dr) => {
+        const s = dr.start_date || "";
+        const e = dr.end_date || "";
+        const block = initData[mId][aId];
+        let rangeObj = block.globalRanges.find(
+          (x) => x.start_date === s && x.end_date === e
+        );
+        if (!rangeObj) {
+          // create new date range block
+          const planObj = {};
+          for (const fp of fidiumPlans) {
+            planObj[fp.id] = { base: "0" };
+          }
+          rangeObj = {
+            id: "db-" + Math.random().toString(36).slice(2),
+            start_date: s,
+            end_date: e,
+            rowIds: [],
+            planValues: planObj,
+          };
+          block.globalRanges.push(rangeObj);
+        }
+        rangeObj.rowIds.push(dr.id);
+        // set the plan's base value
+        rangeObj.planValues[pId].base =
+          dr.manager_commission_value?.toString() || "0";
+      });
+    });
+
+    setOverrideData(initData);
+  }
+
+  // per-plan base override
+  function getPlanBase(mId, aId, pId) {
+    return overrideData[mId]?.[aId]?.plans[pId]?.base || "0";
+  }
+  function setPlanBase(mId, aId, pId, val) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      if (!next[mId]) next[mId] = {};
+      if (!next[mId][aId]) {
+        next[mId][aId] = { plans: {}, globalRanges: [] };
+      }
+      if (!next[mId][aId].plans[pId]) {
+        next[mId][aId].plans[pId] = { base: "0" };
+      }
+      next[mId][aId].plans[pId].base = val;
+      return next;
+    });
+  }
+
+  // agent-level date ranges
+  function addAgentDateRange(mId, aId) {
+    // if no plan has a dbId, show a message or do nothing
+    const block = overrideData[mId]?.[aId];
+    if (!block) return;
+    const hasAnyDbId = Object.values(block.plans).some((p) => p.dbId);
+    if (!hasAnyDbId) {
+      alert(
+        "You must set a base override (and save) for at least one plan before creating date ranges."
+      );
+      return;
     }
-    return existing;
-  }
 
-  function setBaseVal(agentId, planId, newVal) {
-    setOverridesByAgent((prev) => {
-      const oldRow = prev[agentId] || {
-        id: null,
-        manager_id: managerId,
-        agent_id,
-        is_fidium: true,
-        plan_overrides: {},
-        date_ranges: [],
-      };
-      const oldPlan = oldRow.plan_overrides[planId] || { base: "0" };
-      return {
-        ...prev,
-        [agentId]: {
-          ...oldRow,
-          plan_overrides: {
-            ...oldRow.plan_overrides,
-            [planId]: {
-              ...oldPlan,
-              base: newVal,
-            },
-          },
-        },
-      };
+    // otherwise proceed
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const planObj = {};
+      for (const fp of fidiumPlans) {
+        planObj[fp.id] = { base: "0" };
+      }
+      next[mId][aId].globalRanges.push({
+        id: "local-" + Math.random().toString(36).slice(2),
+        start_date: "",
+        end_date: "",
+        rowIds: [],
+        planValues: planObj,
+      });
+      return next;
     });
   }
 
-  function getAgentDateRanges(agentId) {
-    return getOrCreateOverrideRow(agentId).date_ranges || [];
+  function setDateRangeVal(mId, aId, rangeId, field, value) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const ranges = next[mId][aId].globalRanges;
+      const idx = ranges.findIndex((r) => r.id === rangeId);
+      if (idx >= 0) {
+        ranges[idx][field] = value;
+      }
+      return next;
+    });
   }
 
-  function setAgentDateRanges(agentId, newRanges) {
-    setOverridesByAgent((prev) => {
-      const oldRow = getOrCreateOverrideRow(agentId);
-      return {
-        ...prev,
-        [agentId]: {
-          ...oldRow,
-          date_ranges: newRanges,
-        },
-      };
+  function setDateRangePlanVal(mId, aId, rangeId, planId, val) {
+    setOverrideData((prev) => {
+      const next = structuredClone(prev);
+      const ranges = next[mId][aId].globalRanges;
+      const idx = ranges.findIndex((r) => r.id === rangeId);
+      if (idx >= 0) {
+        ranges[idx].planValues[planId].base = val;
+      }
+      return next;
     });
   }
 
   async function handleSave() {
-    // gather all agent rows
-    const assignedAgents = getAssignedAgents(managerId);
-    const allAgentIds = new Set([...assignedAgents.map((a) => a.id), ...Object.keys(overridesByAgent)]);
+    // For each manager->agent, upsert base for each plan => rowId
+    // Then remove old date range rows, then re-insert new from globalRanges
+    for (const mId in overrideData) {
+      for (const aId in overrideData[mId]) {
+        const block = overrideData[mId][aId];
 
-    const rowsToUpsert = [];
-    for (const agentId of allAgentIds) {
-      const rowObj = getOrCreateOverrideRow(agentId);
-      rowsToUpsert.push({
-        id: rowObj.id || undefined,
-        manager_id: rowObj.manager_id,
-        agent_id: rowObj.agent_id,
-        is_fidium: true,
-        plan_overrides: rowObj.plan_overrides || {},
-        date_ranges: rowObj.date_ranges || [],
-      });
-    }
+        // Upsert base for each plan
+        for (const pId in block.plans) {
+          const baseVal = parseFloat(block.plans[pId].base) || 0;
+          let rowId = block.plans[pId].dbId;
 
-    for (const item of rowsToUpsert) {
-      const { error } = await supabase.from("manager_overrides").upsert(item).select("*").single();
-      if (error) {
-        console.error("Error upserting Fidium override row:", error);
+          if (!rowId) {
+            // Insert
+            const { data: inserted } = await supabase
+              .from("fidium_manager_agent_commissions")
+              .insert([
+                {
+                  manager_id: mId,
+                  agent_id: aId,
+                  fidium_plan_id: pId,
+                  manager_commission_value: baseVal,
+                },
+              ])
+              .select("*")
+              .single();
+            if (inserted) {
+              rowId = inserted.id;
+              block.plans[pId].dbId = rowId;
+            }
+          } else {
+            // Update
+            await supabase
+              .from("fidium_manager_agent_commissions")
+              .update({ manager_commission_value: baseVal })
+              .eq("id", rowId);
+          }
+
+          // remove old date range rows and re-insert
+          if (rowId) {
+            await supabase
+              .from("fidium_manager_agent_commission_date_ranges")
+              .delete()
+              .eq("fidium_manager_agent_commission_id", rowId);
+
+            for (const dr of block.globalRanges) {
+              const st = dr.start_date || null;
+              const ed = dr.end_date || null;
+              const valBase = parseFloat(dr.planValues[pId].base) || 0;
+              await supabase
+                .from("fidium_manager_agent_commission_date_ranges")
+                .insert([
+                  {
+                    fidium_manager_agent_commission_id: rowId,
+                    fidium_plan_id: pId,
+                    start_date: st,
+                    end_date: ed,
+                    manager_commission_value: valBase,
+                  },
+                ]);
+            }
+          }
+        }
       }
     }
-
     onClose();
-  }
-
-  if (managerList.length === 0) {
-    return (
-      <Dialog open onClose={onClose} size="md">
-        <DialogTitle>Fidium Manager Overrides ({payscaleName})</DialogTitle>
-        <DialogBody>No Fidium managers found.</DialogBody>
-        <DialogActions>
-          <Button onClick={onClose}>Close</Button>
-        </DialogActions>
-      </Dialog>
-    );
   }
 
   return (
     <Dialog open onClose={onClose} size="xl">
-      <DialogTitle>Fidium Manager Overrides ({payscaleName})</DialogTitle>
-      <DialogBody>
-        <Field className="mb-4">
-          <Label>Select Manager</Label>
-          <Select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
-            {managerList.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name || m.identifier}
-              </option>
-            ))}
-          </Select>
-        </Field>
+      <div className="flex flex-col h-[80vh]">
+        <div className="px-4 py-2 border-b">
+          <h2 className="text-xl font-bold">
+            Fidium Manager Overrides: {payscale.name}
+          </h2>
+        </div>
 
-        <hr className="my-4" />
+        <div className="overflow-auto p-4 flex-1">
+          {managedAgents.length === 0 ? (
+            <div>No agents assigned to managers with this Fidium manager payscale.</div>
+          ) : (
+            managedAgents.map((agent) => {
+              const managerLinks = agentManagers.filter(
+                (am) =>
+                  am.agent_id === agent.id &&
+                  agents.find((x) => x.id === am.manager_id)
+                    ?.fidium_manager_payscale_id === payscale.id
+              );
+              if (!managerLinks.length) return null;
 
-        {getAssignedAgents(managerId).length === 0 && (
-          <div>This manager has no assigned agents.</div>
-        )}
-        {getAssignedAgents(managerId).map((agt) => {
-          const row = getOrCreateOverrideRow(agt.id);
-          return (
-            <div key={agt.id} className="mb-6 border-b pb-4">
-              <h3 className="text-lg font-semibold mb-2">
-                Agent: {agt.name || agt.identifier}
-              </h3>
+              return (
+                <div key={agent.id} className="border p-4 mb-4 rounded bg-gray-50">
+                  <h3 className="font-bold text-lg mb-2">
+                    Agent: {agent.name || agent.identifier}
+                  </h3>
 
-              <p className="text-sm font-medium text-gray-600 mb-2">
-                Base Overrides (per Fidium plan):
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {fidiumPlans.map((fp) => {
-                  const planObj = row.plan_overrides?.[fp.id] || { base: "0" };
-                  return (
-                    <div key={fp.id} className="border p-2 rounded bg-white text-sm">
-                      <div className="font-medium mb-1">{fp.name}</div>
-                      <Field className="flex items-center">
-                        <Label className="w-1/3 text-xs">Base($)</Label>
-                        <Input
-                          type="number"
-                          value={planObj.base}
-                          onChange={(e) =>
-                            setBaseVal(agt.id, fp.id, e.target.value)
-                          }
-                        />
-                      </Field>
-                    </div>
-                  );
-                })}
-              </div>
+                  {managerLinks.map((ml) => {
+                    const manager = agents.find((a) => a.id === ml.manager_id);
+                    if (!manager) return null;
 
-              <p className="text-sm font-medium text-gray-600 mt-4 mb-2">
-                Date Range Overrides
-              </p>
-              <DateRangeManagerFidium
-                fidiumPlans={fidiumPlans}
-                dateRanges={row.date_ranges}
-                setDateRanges={(newRanges) => setAgentDateRanges(agt.id, newRanges)}
-                label="Override Commission Amounts by Date"
-              />
-            </div>
-          );
-        })}
-      </DialogBody>
-      <DialogActions>
-        <Button plain onClick={onClose}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave}>Save All</Button>
-      </DialogActions>
+                    return (
+                      <div key={ml.id} className="mb-4 border-l pl-4">
+                        <p className="text-gray-600 mb-2">
+                          Manager: {manager.name || manager.identifier}
+                        </p>
+
+                        {/* Per-plan base overrides */}
+                        <div className="space-y-3">
+                          {fidiumPlans.map((fp) => {
+                            const baseVal = getPlanBase(manager.id, agent.id, fp.id);
+                            return (
+                              <div key={fp.id} className="flex items-center gap-4">
+                                <span className="w-40 font-semibold">{fp.name}</span>
+                                <Field className="flex items-center">
+                                  <Label className="text-xs mr-1">Base($)</Label>
+                                  <Input
+                                    type="number"
+                                    className="w-20"
+                                    value={baseVal}
+                                    onChange={(e) =>
+                                      setPlanBase(manager.id, agent.id, fp.id, e.target.value)
+                                    }
+                                  />
+                                </Field>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Agent-wide date ranges (for all plans) */}
+                        <div className="mt-4 p-2">
+                          <div className="font-semibold mb-2">Global Date Ranges</div>
+
+                          {overrideData[manager.id]?.[agent.id]?.globalRanges?.map((dr) => (
+                            <div
+                              key={dr.id}
+                              className="border p-2 rounded mb-2 space-y-2"
+                            >
+                              <div className="flex gap-4">
+                                <Field>
+                                  <Label className="text-xs">Start Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={dr.start_date}
+                                    onChange={(e) =>
+                                      setDateRangeVal(
+                                        manager.id,
+                                        agent.id,
+                                        dr.id,
+                                        "start_date",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                                <Field>
+                                  <Label className="text-xs">End Date</Label>
+                                  <Input
+                                    type="date"
+                                    value={dr.end_date}
+                                    onChange={(e) =>
+                                      setDateRangeVal(
+                                        manager.id,
+                                        agent.id,
+                                        dr.id,
+                                        "end_date",
+                                        e.target.value
+                                      )
+                                    }
+                                  />
+                                </Field>
+                              </div>
+
+                              {/* All fidium plans inside this date range */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                {fidiumPlans.map((fp) => {
+                                  const rangeBaseVal =
+                                    dr.planValues[fp.id]?.base || "0";
+                                  return (
+                                    <div
+                                      key={fp.id}
+                                      className="border p-2 rounded text-sm"
+                                    >
+                                      <div className="font-medium mb-1">{fp.name}</div>
+                                      <Field className="flex items-center">
+                                        <Label className="w-1/3 text-xs">Base($)</Label>
+                                        <Input
+                                          type="number"
+                                          value={rangeBaseVal}
+                                          onChange={(e) =>
+                                            setDateRangePlanVal(
+                                              manager.id,
+                                              agent.id,
+                                              dr.id,
+                                              fp.id,
+                                              e.target.value
+                                            )
+                                          }
+                                        />
+                                      </Field>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => addAgentDateRange(manager.id, agent.id)}
+                          >
+                            + Add Date Range
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="border-t p-4 flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>Save Overrides</Button>
+        </div>
+      </div>
     </Dialog>
   );
 }

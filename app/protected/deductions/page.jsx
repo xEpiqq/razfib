@@ -23,25 +23,21 @@ import { Input } from "@/components/input";
 
 export default function DeductionsReimbursementsPage() {
   const supabase = useMemo(() => createClient(), []);
-  const [agents, setAgents] = useState([]);
-  const [reports, setReports] = useState([]);
+  const [reports, setReports] = useState([]); // lines from payroll_reports
+  const [agentMap, setAgentMap] = useState({});
   const [deductions, setDeductions] = useState([]);
 
-  // Main Add/Edit modal
+  // Edit-only modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [deductionData, setDeductionData] = useState({
     id: "",
+    payroll_report_id: "",
     agent_id: "",
     type: "deduction",
     reason: "",
     amount: "",
   });
-
-  // "Mark Done" modal
-  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
-  const [completeDed, setCompleteDed] = useState(null);
-  const [completeReportId, setCompleteReportId] = useState("");
 
   useEffect(() => {
     fetchAgents();
@@ -51,14 +47,22 @@ export default function DeductionsReimbursementsPage() {
 
   async function fetchAgents() {
     const { data } = await supabase.from("agents").select("*");
-    setAgents(data || []);
+    if (!data) {
+      setAgentMap({});
+      return;
+    }
+    const map = {};
+    data.forEach((ag) => {
+      map[ag.id] = ag;
+    });
+    setAgentMap(map);
   }
 
   async function fetchReports() {
-    // We fetch payroll_reports plus the joined batch_name from payroll_report_batches
+    // We'll load lines, plus the joined batch_name from payroll_report_batches
     const { data } = await supabase
       .from("payroll_reports")
-      .select("id, name, batch_id, payroll_report_batches(batch_name)")
+      .select("id, agent_id, name, batch_id, payroll_report_batches(batch_name)")
       .order("created_at", { ascending: false });
     setReports(data || []);
   }
@@ -71,23 +75,13 @@ export default function DeductionsReimbursementsPage() {
     setDeductions(data || []);
   }
 
-  function openAddModal() {
-    setIsEditing(false);
-    setDeductionData({
-      id: "",
-      agent_id: "",
-      type: "deduction",
-      reason: "",
-      amount: "",
-    });
-    setIsModalOpen(true);
-  }
-
+  // We keep only the Edit functionality; no adding new from here.
   function openEditModal(ded) {
     setIsEditing(true);
     setDeductionData({
       id: ded.id,
-      agent_id: ded.agent_id,
+      payroll_report_id: ded.payroll_report_id || "",
+      agent_id: ded.agent_id || "",
       type: ded.type,
       reason: ded.reason || "",
       amount: ded.amount.toString() || "",
@@ -97,117 +91,71 @@ export default function DeductionsReimbursementsPage() {
 
   async function saveDeduction() {
     const payload = {
-      agent_id: deductionData.agent_id,
+      payroll_report_id: deductionData.payroll_report_id || null,
+      agent_id: deductionData.agent_id || null,
       type: deductionData.type,
       reason: deductionData.reason || "",
       amount: parseFloat(deductionData.amount) || 0,
     };
 
     if (isEditing && deductionData.id) {
-      // Update existing
       await supabase
         .from("deductions_reimbursements")
         .update(payload)
         .eq("id", deductionData.id);
-    } else {
-      // Insert new
-      await supabase.from("deductions_reimbursements").insert([payload]);
     }
+    // no else => cannot create new here
 
     setIsModalOpen(false);
-    await fetchDeductions();
-  }
-
-  // Mark done or re-open
-  function handleMarkDone(ded) {
-    if (ded.is_completed) {
-      // It's completed => re-open
-      reopenDeduction(ded);
-    } else {
-      // It's open => ask them to pick a report
-      setCompleteDed(ded);
-      setCompleteReportId(ded.payroll_report_id || "");
-      setIsCompleteModalOpen(true);
-    }
-  }
-
-  async function reopenDeduction(ded) {
-    await supabase
-      .from("deductions_reimbursements")
-      .update({
-        is_completed: false,
-        completed_at: null,
-        payroll_report_id: null,
-      })
-      .eq("id", ded.id);
     fetchDeductions();
   }
 
-  // user chooses which report => set is_completed = true
-  async function completeDeduction() {
-    if (!completeDed) return;
-    await supabase
-      .from("deductions_reimbursements")
-      .update({
-        is_completed: true,
-        completed_at: new Date().toISOString(),
-        payroll_report_id: completeReportId || null,
-      })
-      .eq("id", completeDed.id);
-
-    setIsCompleteModalOpen(false);
-    setCompleteDed(null);
-    setCompleteReportId("");
-    fetchDeductions();
-  }
-
-  // Delete an entry
   async function handleDelete(id) {
-    const confirmMsg = "Are you sure you want to delete this deduction?";
+    const confirmMsg = "Are you sure you want to delete this item?";
     if (!window.confirm(confirmMsg)) return;
-    await supabase
-      .from("deductions_reimbursements")
-      .delete()
-      .eq("id", id);
+    await supabase.from("deductions_reimbursements").delete().eq("id", id);
     fetchDeductions();
   }
+
+  // For the disabled logic: if isEditing => these fields are shown but disabled.
+  const selectedLine = reports.find((r) => r.id === deductionData.payroll_report_id);
 
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Deductions / Reimbursements</h1>
-        <Button onClick={openAddModal}>Add Entry</Button>
+        {/* No "Add Entry" button => no new creation from here */}
       </div>
 
       <Table striped>
         <TableHead>
           <TableRow>
-            <TableHeader>Agent</TableHeader>
+            {/* We'll show the batch_name for the "Report" column, not the line name. */}
+            <TableHeader>Report (Batch Name)</TableHeader>
+            <TableHeader>Agent Name</TableHeader>
             <TableHeader>Type</TableHeader>
             <TableHeader>Reason</TableHeader>
             <TableHeader>Amount</TableHeader>
-            <TableHeader>Linked Report (Batch)</TableHeader>
             <TableHeader>Status</TableHeader>
             <TableHeader>Actions</TableHeader>
           </TableRow>
         </TableHead>
         <TableBody>
           {deductions.map((ded) => {
-            const ag = agents.find((a) => a.id === ded.agent_id);
             const r = reports.find((rep) => rep.id === ded.payroll_report_id);
-            // Show the batch name from payroll_report_batches
             const batchLabel = r?.payroll_report_batches?.batch_name || "—";
+            const agentObj = agentMap[ded.agent_id];
+            const agentName = agentObj
+              ? agentObj.name || agentObj.identifier || ded.agent_id
+              : ded.agent_id || "—";
+
             return (
               <TableRow key={ded.id}>
-                <TableCell>{ag?.name || ag?.identifier || "Unknown"}</TableCell>
+                <TableCell>{batchLabel}</TableCell>
+                <TableCell>{agentName}</TableCell>
                 <TableCell>{ded.type}</TableCell>
                 <TableCell>{ded.reason || "-"}</TableCell>
-                <TableCell>
-                  {"$" + (parseFloat(ded.amount) || 0).toFixed(2)}
-                </TableCell>
-                <TableCell>
-                  {batchLabel}
-                </TableCell>
+                <TableCell>{"$" + (parseFloat(ded.amount) || 0).toFixed(2)}</TableCell>
                 <TableCell>
                   {ded.is_completed ? (
                     <span className="text-green-600">Completed</span>
@@ -218,13 +166,6 @@ export default function DeductionsReimbursementsPage() {
                 <TableCell className="space-x-2">
                   <Button size="sm" onClick={() => openEditModal(ded)}>
                     Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleMarkDone(ded)}
-                  >
-                    {ded.is_completed ? "Re-open" : "Mark Done"}
                   </Button>
                   <Button
                     size="sm"
@@ -240,26 +181,50 @@ export default function DeductionsReimbursementsPage() {
         </TableBody>
       </Table>
 
-      {/* Add / Edit Modal */}
+      {/* Edit-only Modal */}
       <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} size="xl">
         <DialogTitle>
-          {isEditing ? "Edit Entry" : "Add Deduction / Reimbursement"}
+          {isEditing ? "Edit Entry" : ""}
         </DialogTitle>
         <DialogBody>
           <Field className="mb-4">
-            <Label>Agent</Label>
+            <Label>Pick Report (Batch)</Label>
+            <Select
+              value={deductionData.payroll_report_id}
+              onChange={(e) =>
+                setDeductionData({ ...deductionData, payroll_report_id: e.target.value })
+              }
+              disabled={isEditing} // Freeze if editing
+            >
+              <option value="">(None)</option>
+              {reports.map((r) => {
+                const b = r.payroll_report_batches?.batch_name || "Unnamed Batch";
+                return (
+                  <option key={r.id} value={r.id}>
+                    {b}
+                  </option>
+                );
+              })}
+            </Select>
+          </Field>
+
+          <Field className="mb-4">
+            <Label>Pick Agent (Name)</Label>
             <Select
               value={deductionData.agent_id}
-              onChange={(e) =>
-                setDeductionData({ ...deductionData, agent_id: e.target.value })
-              }
+              onChange={(e) => setDeductionData({ ...deductionData, agent_id: e.target.value })}
+              disabled={isEditing} // Freeze if editing
             >
-              <option value="">Select agent...</option>
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name || a.identifier}
+              <option value="">(None)</option>
+              {selectedLine && selectedLine.agent_id && (
+                <option value={selectedLine.agent_id}>
+                  {agentMap[selectedLine.agent_id]
+                    ? agentMap[selectedLine.agent_id].name ||
+                      agentMap[selectedLine.agent_id].identifier ||
+                      selectedLine.agent_id
+                    : selectedLine.agent_id}
                 </option>
-              ))}
+              )}
             </Select>
           </Field>
 
@@ -302,39 +267,7 @@ export default function DeductionsReimbursementsPage() {
           <Button plain onClick={() => setIsModalOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={saveDeduction}>{isEditing ? "Save" : "Add"}</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Mark Done Modal */}
-      <Dialog
-        open={isCompleteModalOpen}
-        onClose={() => setIsCompleteModalOpen(false)}
-        size="md"
-      >
-        <DialogTitle>Complete Deduction</DialogTitle>
-        <DialogBody>
-          <Field className="mb-4">
-            <Label>Select Report (Batch)</Label>
-            <Select
-              value={completeReportId}
-              onChange={(e) => setCompleteReportId(e.target.value)}
-            >
-              <option value="">(None)</option>
-              {reports.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {/* Show batch_name from the joined object */}
-                  {r.payroll_report_batches?.batch_name || "Unnamed Batch"}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </DialogBody>
-        <DialogActions>
-          <Button plain onClick={() => setIsCompleteModalOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={completeDeduction}>Mark as Done</Button>
+          <Button onClick={saveDeduction}>Save</Button>
         </DialogActions>
       </Dialog>
     </div>

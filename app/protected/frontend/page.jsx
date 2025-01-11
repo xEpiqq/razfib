@@ -24,31 +24,84 @@ import {
   DropdownMenu,
   DropdownDivider,
 } from "@/components/dropdown";
+import {
+  Dialog,
+  DialogTitle,
+  DialogBody,
+  DialogActions,
+} from "@/components/dialog";
+import { Field, Label } from "@/components/fieldset";
+import { Select } from "@/components/select";
+import { Input } from "@/components/input";
+
+/**
+ * Overdue if install_date is older than 90 days from now.
+ */
+function isOverdue(install_date) {
+  if (!install_date) return false;
+  const now = new Date();
+  return (now - new Date(install_date)) / (1000 * 60 * 60 * 24) > 90;
+}
 
 export default function ReportsPage() {
   const supabase = useMemo(() => createClient(), []);
   const [batches, setBatches] = useState([]);
+  const [batchPaidMap, setBatchPaidMap] = useState({});
   const [selectedBatchId, setSelectedBatchId] = useState(null);
+
   const [reportLines, setReportLines] = useState([]);
   const [expandedAgents, setExpandedAgents] = useState(new Set());
   const [loading, setLoading] = useState(false);
+
   const [wgeMap, setWgeMap] = useState({});
   const [fwgMap, setFwgMap] = useState({});
-  const [batchPaidMap, setBatchPaidMap] = useState({});
+
+  // lineId => array of D/R
+  const [lineDedMap, setLineDedMap] = useState({});
+
+  // We'll store a map of agent_id => agent object for name display if needed
+  const [agentMap, setAgentMap] = useState({});
+
+  // The modal for "Attach Deduction / Reimbursement" - now only "Create New" portion
+  const [showAttachModal, setShowAttachModal] = useState(false);
+
+  // For creating a new D/R
+  const [newDed, setNewDed] = useState({
+    payroll_report_id: "",
+    agent_id: "",
+    type: "deduction",
+    reason: "",
+    amount: "",
+  });
+  const [selectedReportLine, setSelectedReportLine] = useState(null);
 
   useEffect(() => {
+    fetchAgents();
     fetchBatches();
   }, []);
 
+  async function fetchAgents() {
+    const { data } = await supabase.from("agents").select("*");
+    if (!data) {
+      setAgentMap({});
+      return;
+    }
+    const map = {};
+    data.forEach((ag) => {
+      map[ag.id] = ag;
+    });
+    setAgentMap(map);
+  }
+
   async function fetchBatches() {
     setLoading(true);
-    const { data: batchData, error: batchError } = await supabase
+    const { data: batchData, error } = await supabase
       .from("payroll_report_batches")
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (batchError) {
-      console.error("Error fetching batches:", batchError);
+    if (error) {
+      console.error("Error fetching batches:", error);
       setLoading(false);
       return;
     }
@@ -88,36 +141,37 @@ export default function ReportsPage() {
     }
     data.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
-    const allWgeIds = [];
-    const allFwgIds = [];
+    // Grab all relevant WGE / FWG
+    const wIds = [];
+    const fIds = [];
     for (const line of data) {
       if (Array.isArray(line.details)) {
         for (const d of line.details) {
-          if (d.white_glove_entry_id) allWgeIds.push(d.white_glove_entry_id);
-          if (d.fidium_white_glove_id) allFwgIds.push(d.fidium_white_glove_id);
+          if (d.white_glove_entry_id) wIds.push(d.white_glove_entry_id);
+          if (d.fidium_white_glove_id) fIds.push(d.fidium_white_glove_id);
         }
       }
     }
 
-    let wgeById = {};
-    if (allWgeIds.length > 0) {
+    let wMap = {};
+    if (wIds.length > 0) {
       const { data: wgeData } = await supabase
         .from("white_glove_entries")
         .select("*")
-        .in("id", allWgeIds);
+        .in("id", wIds);
       (wgeData || []).forEach((w) => {
-        wgeById[w.id] = w;
+        wMap[w.id] = w;
       });
     }
 
-    let fwgById = {};
-    if (allFwgIds.length > 0) {
+    let fMap = {};
+    if (fIds.length > 0) {
       const { data: fwgData } = await supabase
         .from("fidium_white_glove_entries")
         .select("*")
-        .in("id", allFwgIds);
+        .in("id", fIds);
       (fwgData || []).forEach((f) => {
-        fwgById[f.id] = f;
+        fMap[f.id] = f;
       });
     }
 
@@ -127,10 +181,8 @@ export default function ReportsPage() {
       const allPaid =
         lineAccs.length > 0 &&
         lineAccs.every((acc) => {
-          if (acc.white_glove_entry_id)
-            return wgeById[acc.white_glove_entry_id]?.frontend_paid;
-          if (acc.fidium_white_glove_id)
-            return fwgById[acc.fidium_white_glove_id]?.frontend_paid;
+          if (acc.white_glove_entry_id) return wMap[acc.white_glove_entry_id]?.frontend_paid;
+          if (acc.fidium_white_glove_id) return fMap[acc.fidium_white_glove_id]?.frontend_paid;
           return true;
         });
       if (allPaid && !line.frontend_is_paid) {
@@ -143,10 +195,36 @@ export default function ReportsPage() {
     }
 
     setReportLines(data);
-    setWgeMap(wgeById);
-    setFwgMap(fwgById);
+    setWgeMap(wMap);
+    setFwgMap(fMap);
     setExpandedAgents(new Set());
     setLoading(false);
+
+    // load D/R for these lines
+    const lineIds = data.map((l) => l.id);
+    await loadDedsForLines(lineIds);
+  }
+
+  async function loadDedsForLines(lineIds) {
+    if (!lineIds || lineIds.length === 0) {
+      setLineDedMap({});
+      return;
+    }
+    const { data: dedData } = await supabase
+      .from("deductions_reimbursements")
+      .select("*")
+      .in("payroll_report_id", lineIds);
+
+    let map = {};
+    if (dedData && dedData.length > 0) {
+      for (const d of dedData) {
+        if (!map[d.payroll_report_id]) {
+          map[d.payroll_report_id] = [];
+        }
+        map[d.payroll_report_id].push(d);
+      }
+    }
+    setLineDedMap(map);
   }
 
   function enterBatch(batch_id) {
@@ -159,15 +237,8 @@ export default function ReportsPage() {
     setReportLines([]);
     setWgeMap({});
     setFwgMap({});
+    setLineDedMap({});
     await fetchBatches();
-  }
-
-  function toggleAgentExpand(line) {
-    setExpandedAgents((prev) => {
-      const newSet = new Set(prev);
-      newSet.has(line.id) ? newSet.delete(line.id) : newSet.add(line.id);
-      return newSet;
-    });
   }
 
   async function togglePaid(line) {
@@ -178,11 +249,9 @@ export default function ReportsPage() {
       .eq("id", line.id)
       .select("*");
     if (!updatedLineData) return;
-    const updatedLine = updatedLineData[0];
 
-    const lineAccs = Array.isArray(updatedLine.details)
-      ? updatedLine.details
-      : [];
+    const updatedLine = updatedLineData[0];
+    const lineAccs = Array.isArray(updatedLine.details) ? updatedLine.details : [];
     const wIds = lineAccs
       .filter((d) => d.white_glove_entry_id)
       .map((d) => d.white_glove_entry_id);
@@ -214,10 +283,33 @@ export default function ReportsPage() {
       setFwgMap(newMap);
     }
 
-    setReportLines((prev) => prev.map((r) => (r.id === line.id ? updatedLine : r)));
+    // Mark line D/R as completed if newly paid
     if (newPaidValue) {
-      setExpandedAgents((prev) => new Set([...prev, updatedLine.id]));
+      await supabase
+        .from("deductions_reimbursements")
+        .update({
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("payroll_report_id", updatedLine.id)
+        .eq("is_completed", false);
     }
+
+    setReportLines((prev) =>
+      prev.map((r) => (r.id === line.id ? updatedLine : r))
+    );
+
+    if (selectedBatchId) {
+      loadDedsForLines(reportLines.map((l) => l.id));
+    }
+  }
+
+  function toggleAgentExpand(line) {
+    setExpandedAgents((prev) => {
+      const newSet = new Set(prev);
+      newSet.has(line.id) ? newSet.delete(line.id) : newSet.add(line.id);
+      return newSet;
+    });
   }
 
   async function toggleAccountPaid(line, type, entryId) {
@@ -262,15 +354,29 @@ export default function ReportsPage() {
       }
       return true;
     });
-    if (allPaid && !line.frontend_is_paid) {
+
+    const currentlyPaid = line.frontend_is_paid;
+    if (allPaid && !currentlyPaid) {
       await supabase
         .from("payroll_reports")
         .update({ frontend_is_paid: true })
         .eq("id", line.id);
+      await supabase
+        .from("deductions_reimbursements")
+        .update({
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("payroll_report_id", line.id)
+        .eq("is_completed", false);
+
       setReportLines((prev) =>
         prev.map((r) => (r.id === line.id ? { ...r, frontend_is_paid: true } : r))
       );
-    } else if (!allPaid && line.frontend_is_paid) {
+      if (selectedBatchId) {
+        loadDedsForLines(reportLines.map((l) => l.id));
+      }
+    } else if (!allPaid && currentlyPaid) {
       await supabase
         .from("payroll_reports")
         .update({ frontend_is_paid: false })
@@ -306,6 +412,49 @@ export default function ReportsPage() {
     }
   }
 
+  // Only "Create New" in the modal. We remove the "Attach Existing" UI entirely.
+  function openAttachModal() {
+    setShowAttachModal(true);
+    setNewDed({
+      payroll_report_id: "",
+      agent_id: "",
+      type: "deduction",
+      reason: "",
+      amount: "",
+    });
+    setSelectedReportLine(null);
+  }
+
+  function handleReportChange(lineId) {
+    setNewDed((prev) => ({ ...prev, payroll_report_id: lineId, agent_id: "" }));
+    const foundLine = reportLines.find((l) => l.id === lineId);
+    setSelectedReportLine(foundLine || null);
+  }
+
+  async function createNewDed() {
+    const amt = parseFloat(newDed.amount) || 0;
+    if (!newDed.payroll_report_id || !newDed.agent_id || amt === 0) return;
+
+    const payload = {
+      agent_id: newDed.agent_id,
+      payroll_report_id: newDed.payroll_report_id,
+      type: newDed.type,
+      reason: newDed.reason || "",
+      amount: amt,
+      is_completed: false,
+    };
+    await supabase.from("deductions_reimbursements").insert([payload]);
+    setNewDed({
+      payroll_report_id: "",
+      agent_id: "",
+      type: "deduction",
+      reason: "",
+      amount: "",
+    });
+    setSelectedReportLine(null);
+    loadDedsForLines(reportLines.map((l) => l.id));
+  }
+
   if (!selectedBatchId) {
     return (
       <div className="p-6 space-y-6 font-sans text-gray-900">
@@ -338,13 +487,9 @@ export default function ReportsPage() {
                       <EllipsisVerticalIcon className="h-5 w-5 text-gray-500" />
                     </DropdownButton>
                     <DropdownMenu className="min-w-32" anchor="bottom end">
-                      <DropdownItem onClick={() => renameBatch(b)}>
-                        Rename
-                      </DropdownItem>
+                      <DropdownItem onClick={() => renameBatch(b)}>Rename</DropdownItem>
                       <DropdownDivider />
-                      <DropdownItem onClick={() => deleteBatch(b)}>
-                        Delete
-                      </DropdownItem>
+                      <DropdownItem onClick={() => deleteBatch(b)}>Delete</DropdownItem>
                     </DropdownMenu>
                   </Dropdown>
                 </div>
@@ -369,7 +514,11 @@ export default function ReportsPage() {
 
   return (
     <div className="p-6 space-y-6 font-sans text-gray-900">
-      <Button onClick={goBack}>Back to Batches</Button>
+      <div className="flex items-center justify-between">
+        <Button onClick={goBack}>Back to Batches</Button>
+        <Button onClick={openAttachModal}>Attach Deduction / Reimbursement</Button>
+      </div>
+
       <h3 className="text-lg font-bold mt-4">Batch Details (Frontend)</h3>
       <div className="flex items-center space-x-4 mb-4">
         <div>Total lines: {reportLines.length}</div>
@@ -382,6 +531,7 @@ export default function ReportsPage() {
         />
       </div>
       {loading && <div>Loading...</div>}
+
       <Table striped>
         <TableHead>
           <TableRow>
@@ -392,23 +542,48 @@ export default function ReportsPage() {
             <TableHeader>Personal Total</TableHeader>
             <TableHeader>Manager Total</TableHeader>
             <TableHeader>Upfront</TableHeader>
+            <TableHeader>Deductions/Reimb</TableHeader>
+            <TableHeader>Net</TableHeader>
           </TableRow>
         </TableHead>
         <TableBody>
           {reportLines.map((line) => {
             const isExpanded = expandedAgents.has(line.id);
-            const personalTotalDisplay =
-              typeof line.personal_total === "number"
-                ? `$${line.personal_total.toFixed(2)}`
-                : "N/A";
-            const managerTotalDisplay =
+            const personalTotal =
+              typeof line.personal_total === "number" ? line.personal_total : 0;
+            const personal80 = personalTotal * 0.8;
+            const managerTotal =
               typeof line.manager_total === "number" && line.manager_total > 0
-                ? `$${line.manager_total.toFixed(2)}`
-                : "N/A";
+                ? line.manager_total
+                : 0;
+
+            const personalTotalDisplay =
+              personalTotal > 0 ? `$${personalTotal.toFixed(2)}` : "N/A";
+            const managerTotalDisplay =
+              managerTotal > 0 ? `$${managerTotal.toFixed(2)}` : "N/A";
+
             const upfrontDisplay =
               line.upfront_value !== null && !isNaN(line.upfront_value)
                 ? `$${line.upfront_value.toFixed(2)} (${line.upfront_percentage}%)`
                 : "N/A";
+
+            const lineDeds = lineDedMap[line.id] || [];
+            let dedSum = 0;
+            const dedStrings = lineDeds.map((d) => {
+              const sign = d.type === "deduction" ? -1 : 1;
+              const value = sign * (d.amount || 0);
+              dedSum += value;
+              const displayVal =
+                (sign > 0 ? "+" : "-") + `$${Math.abs(d.amount).toFixed(2)}`;
+              const colorClass = sign > 0 ? "text-green-600" : "text-red-600";
+              return (
+                <span key={d.id} className={colorClass}>
+                  {displayVal}
+                </span>
+              );
+            });
+
+            const netVal = personal80 + dedSum;
 
             return (
               <React.Fragment key={line.id}>
@@ -437,10 +612,18 @@ export default function ReportsPage() {
                   <TableCell>{personalTotalDisplay}</TableCell>
                   <TableCell>{managerTotalDisplay}</TableCell>
                   <TableCell>{upfrontDisplay}</TableCell>
+                  <TableCell>
+                    {dedStrings.length > 0 ? (
+                      <div className="flex flex-col gap-1">{dedStrings}</div>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell>${netVal.toFixed(2)}</TableCell>
                 </TableRow>
                 {isExpanded && (
                   <TableRow>
-                    <TableCell colSpan={7} className="bg-gray-50">
+                    <TableCell colSpan={9} className="bg-gray-50">
                       <div className="p-4">
                         <h4 className="font-bold mb-2">Sales Details</h4>
                         <Table striped>
@@ -544,6 +727,96 @@ export default function ReportsPage() {
           })}
         </TableBody>
       </Table>
+
+      {showAttachModal && (
+        <Dialog open onClose={() => setShowAttachModal(false)} size="xl">
+          <DialogTitle>Attach Deduction / Reimbursement</DialogTitle>
+          <DialogBody>
+            {/* Only "Create New" content now */}
+            <div className="p-3 rounded">
+              <h4 className="font-semibold mb-2">Create New</h4>
+              <Field className="mb-2">
+                <Label>Report (Line)</Label>
+                <Select
+                  value={newDed.payroll_report_id}
+                  onChange={(e) => {
+                    handleReportChange(e.target.value);
+                  }}
+                >
+                  <option value="">(Select a line)</option>
+                  {reportLines.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+
+              <Field className="mb-2">
+                <Label>Agent</Label>
+                <Select
+                  value={newDed.agent_id}
+                  onChange={(e) =>
+                    setNewDed((prev) => ({ ...prev, agent_id: e.target.value }))
+                  }
+                >
+                  <option value="">(Select agent)</option>
+                  {selectedReportLine && selectedReportLine.agent_id && (
+                    <option value={selectedReportLine.agent_id}>
+                      {agentMap[selectedReportLine.agent_id]
+                        ? agentMap[selectedReportLine.agent_id].name ||
+                          agentMap[selectedReportLine.agent_id].identifier ||
+                          selectedReportLine.agent_id
+                        : selectedReportLine.agent_id}
+                    </option>
+                  )}
+                </Select>
+              </Field>
+
+              <Field className="mb-2">
+                <Label>Type</Label>
+                <Select
+                  value={newDed.type}
+                  onChange={(e) =>
+                    setNewDed((prev) => ({ ...prev, type: e.target.value }))
+                  }
+                >
+                  <option value="deduction">Deduction</option>
+                  <option value="reimbursement">Reimbursement</option>
+                </Select>
+              </Field>
+
+              <Field className="mb-2">
+                <Label>Reason</Label>
+                <Input
+                  value={newDed.reason}
+                  onChange={(e) =>
+                    setNewDed((prev) => ({ ...prev, reason: e.target.value }))
+                  }
+                />
+              </Field>
+
+              <Field className="mb-4">
+                <Label>Amount</Label>
+                <Input
+                  type="number"
+                  value={newDed.amount}
+                  onChange={(e) =>
+                    setNewDed((prev) => ({ ...prev, amount: e.target.value }))
+                  }
+                />
+              </Field>
+
+              <Button onClick={createNewDed}>Create</Button>
+            </div>
+          </DialogBody>
+          <DialogActions>
+            <Button plain onClick={() => setShowAttachModal(false)}>
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </div>
   );
 }
