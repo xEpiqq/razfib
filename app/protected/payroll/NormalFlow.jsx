@@ -78,6 +78,7 @@ async function upsertMatchedWhiteGloveEntries(supabase, matchedWgRows) {
     year_completed: row["Year Completed"] ? parseInt(row["Year Completed"], 10) : null,
     month_due: row["Month Due"] ? parseInt(row["Month Due"], 10) : null,
     year_due: row["Year Due"] ? parseInt(row["Year Due"], 10) : null,
+    install_date: row["Order Completed/Cancelled"] || null
   }));
   // Upsert by order_number
   await supabase.from("white_glove_entries").upsert(entries, { onConflict: "order_number" });
